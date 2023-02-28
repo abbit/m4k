@@ -18,12 +18,12 @@ import (
 	"github.com/abbit/m4k/internal/protocol"
 	"github.com/abbit/m4k/internal/util"
 	"github.com/disintegration/imaging"
+	"github.com/schollz/progressbar/v3"
 	"golang.org/x/sync/errgroup"
 )
 
 // TODO: add a way to only send file without processing
 // TODO: print merged file size
-// TODO: print uploading progress bar
 
 const (
 	KindlePW5Width  = 1236 // px
@@ -149,13 +149,14 @@ func (cb *ComicBook) FileName() string {
 func (cb *ComicBook) TransformForKindle() error {
 	g := &errgroup.Group{}
 
+    progress := progressbar.Default(int64(len(cb.Pages)), "Transforming pages...")
 	for _, p := range cb.Pages {
 		p := p
 		g.Go(func() error {
 			if err := p.TransformForKindle(); err != nil {
 				return err
 			}
-
+            progress.Add(1)
 			return nil
 		})
 	}
@@ -184,13 +185,20 @@ func (cb *ComicBook) WriteTo(wr io.Writer) (n int64, err error) {
 	return
 }
 
+func (cb *ComicBook) fillCbzData() error {
+    buf := new(bytes.Buffer)
+    if _, err := cb.WriteTo(buf); err != nil {
+        return err
+    }
+    cb.cbzData = buf.Bytes()
+    return nil
+}
+
 func (cb *ComicBook) Reader() (*bytes.Reader, error) {
 	if cb.cbzData == nil {
-		buf := new(bytes.Buffer)
-		if _, err := cb.WriteTo(buf); err != nil {
-			return nil, err
-		}
-        cb.cbzData = buf.Bytes()
+        if err := cb.fillCbzData(); err != nil {
+            return nil, err
+        }
 	}
 
 	return bytes.NewReader(cb.cbzData), nil
@@ -225,8 +233,12 @@ func saveComicBookToFile(path string, cb *ComicBook) error {
 		os.Remove(path)
 		return err
 	}
+    progress := progressbar.DefaultBytes(
+        cbReader.Size(),
+        "saving...",
+    )
 
-	if _, err = io.Copy(file, cbReader); err != nil {
+	if _, err = io.Copy(io.MultiWriter(file, progress), cbReader); err != nil {
 		os.Remove(path)
 		return err
 	}
@@ -251,7 +263,12 @@ func sendComicBookToKindle(addr string, cb *ComicBook) error {
 	if err != nil {
 		return err
 	}
-	return p.SendManga(cb.Name, cbReader)
+    progress := progressbar.DefaultBytes(
+        cbReader.Size(),
+        "uploading...",
+    )
+
+	return p.SendManga(cb.Name, io.TeeReader(cbReader, progress))
 }
 
 type Flags struct {
