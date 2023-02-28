@@ -15,6 +15,7 @@ import (
 )
 
 // TODO: remove timeout
+// TODO: wait for clients to close their connections when shutting down gracefully
 // TOOD: measure performance with HTTP
 // TODO: incapsulate logic in server struct
 // TODO: handle multiple connections?
