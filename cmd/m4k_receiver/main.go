@@ -14,7 +14,6 @@ import (
 	"github.com/abbit/m4k/internal/protocol"
 )
 
-// TODO: handle signals
 // TODO: remove timeout
 // TOOD: measure performance with HTTP
 // TODO: incapsulate logic in server struct
