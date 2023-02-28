@@ -6,7 +6,9 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/abbit/m4k/internal/protocol"
@@ -15,6 +17,8 @@ import (
 // TODO: handle signals
 // TODO: remove timeout
 // TOOD: measure performance with HTTP
+// TODO: incapsulate logic in server struct
+// TODO: handle multiple connections?
 
 func handleConnection(conn net.Conn, destdir string) {
 	p := protocol.New(conn)
@@ -22,7 +26,7 @@ func handleConnection(conn net.Conn, destdir string) {
 
 	err := p.ReceiveManga(destdir)
 	if err != nil {
-		log.Fatalf("Error when receiving manga: %v\n", err)
+		log.Printf("Error when receiving manga: %v\n", err)
 	}
 }
 
@@ -85,19 +89,25 @@ func main() {
 	go func() {
 		conn, err := l.Accept()
 		if err != nil {
-			log.Fatalf("Error when accepting connection: %v\n", err)
+            // TODO: dont print error if listener is closed when exiting
+			log.Printf("Error when accepting connection: %v\n", err)
+            return
 		}
 		conn.SetDeadline(time.Now().Add(15 * time.Minute))
 		connChan <- conn
 	}()
 
+    exitsig := make(chan os.Signal, 1) 
+    signal.Notify(exitsig, syscall.SIGINT, syscall.SIGTERM)
 	select {
 	case conn := <-connChan:
 		log.Printf("%s connected, starting file receiving...\n", conn.LocalAddr().String())
 		handleConnection(conn, flags.destdir)
-	case <-time.After(2 * time.Minute):
+	case <-time.After(5 * time.Minute):
 		log.Println("Hit timeout")
+    case <-exitsig:
+        log.Println("Received exit signal.")
 	}
 
-    log.Println("Exiting.")
+    log.Println("Exiting...")
 }
