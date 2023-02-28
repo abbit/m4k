@@ -78,7 +78,7 @@ func (p *Protocol) SendManga(name string, r io.Reader) error {
 	return nil
 }
 
-func (p *Protocol) ReceiveManga() error {
+func (p *Protocol) ReceiveManga(destdir string) error {
 	// receive file name
 	nameBytes, err := p.read()
 	if err != nil {
@@ -88,8 +88,7 @@ func (p *Protocol) ReceiveManga() error {
 
 	// create dest file
 	// TODO: handle situation when file already exists
-    // TODO: make dest path customizable
-	file, err := os.Create(fmt.Sprintf("/mnt/us/documents/Manga/%s.cbz", filepath.Base(name)))
+	file, err := os.Create(filepath.Join(destdir, fmt.Sprintf("%s.cbz", filepath.Base(name))))
 	if err != nil {
 		return fmt.Errorf("creating receiving file: %v", err)
 	}

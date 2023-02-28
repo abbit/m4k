@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/abbit/m4k/internal/protocol"
@@ -15,29 +16,39 @@ import (
 // TODO: remove timeout
 // TOOD: measure performance with HTTP
 
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, destdir string) {
 	p := protocol.New(conn)
 	defer p.Close()
 
-	err := p.ReceiveManga()
+	err := p.ReceiveManga(destdir)
 	if err != nil {
 		log.Fatalf("Error when receiving manga: %v\n", err)
 	}
 }
 
 type Flags struct {
-	port, pidfile string
+	port string
+    pidfile string
+    destdir string
 }
 
 func parseFlags() *Flags {
 	flags := &Flags{}
-	flag.StringVar(&flags.port, "port", "49494", "Port for receiver")
 	flag.StringVar(&flags.pidfile, "pidfile", "", "Path to where store pid file")
+	flag.StringVar(&flags.port, "port", "49494", "Port for receiver")
+    flag.StringVar(&flags.destdir, "destdir", "/mnt/us/documents/Manga", "Path destination directory")
 	flag.Parse()
 
 	if flags.pidfile == "" {
 		log.Fatalf("-pidfile option is required.\n")
 	}
+
+    absdest, err := filepath.Abs(flags.destdir)
+    if err != nil {
+        log.Fatalf("Error when resolving absolute destination directory path: %v.\n", err)
+    }
+
+    flags.destdir = absdest
 
 	return flags
 }
@@ -49,6 +60,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error when creating pid file: %v\n", err)
 	}
+
 	defer func() {
 		if err := pidfile.Close(); err != nil {
 			log.Printf("Error when closing pid file: %v\n", err)
@@ -67,7 +79,7 @@ func main() {
 		log.Fatalf("Error when starting server: %v\n", err)
 	}
 	defer l.Close()
-	log.Printf("Listening on %s\n", l.Addr().String())
+	log.Printf("Listening on %s, destination directory - %s\n", l.Addr().String(), flags.destdir)
 
 	connChan := make(chan net.Conn, 1)
 	go func() {
@@ -82,7 +94,7 @@ func main() {
 	select {
 	case conn := <-connChan:
 		log.Printf("%s connected, starting file receiving...\n", conn.LocalAddr().String())
-		handleConnection(conn)
+		handleConnection(conn, flags.destdir)
 	case <-time.After(2 * time.Minute):
 		log.Println("Hit timeout")
 	}
