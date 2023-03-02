@@ -14,17 +14,66 @@ import (
 	"github.com/abbit/m4k/internal/protocol"
 )
 
-// TODO: remove timeout
 // TODO: wait for clients to close their connections when shutting down gracefully
 // TOOD: measure performance with HTTP
-// TODO: incapsulate logic in server struct
 // TODO: handle multiple connections?
 
-func handleConnection(conn net.Conn, destdir string) {
+type server struct {
+	addr    string
+	destDir string
+}
+
+func NewServer(addr, destdir string) *server {
+	return &server{
+		addr:    addr,
+		destDir: destdir,
+	}
+}
+
+func (srv *server) ListenAndServe() error {
+	l, err := net.Listen("tcp", srv.addr)
+	if err != nil {
+		return err
+	}
+	log.Printf("Listening on %s, destination directory - %s\n", l.Addr().String(), srv.destDir)
+	return srv.Serve(l)
+}
+
+func (srv *server) Serve(l net.Listener) error {
+	defer l.Close()
+
+	connChan := make(chan net.Conn, 1)
+	go func() {
+		conn, err := l.Accept()
+		if err != nil {
+			// TODO: dont print error if listener is closed when exiting
+			log.Printf("Error when accepting connection: %v\n", err)
+			return
+		}
+		conn.SetDeadline(time.Now().Add(15 * time.Minute))
+		connChan <- conn
+	}()
+
+	// TODO: handle signals outside of server
+	exitsig := make(chan os.Signal, 1)
+	signal.Notify(exitsig, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case conn := <-connChan:
+		srv.handleConnection(conn)
+	case <-exitsig:
+		log.Println("Received exit signal, exiting...")
+	}
+
+	return nil
+}
+
+func (srv *server) handleConnection(conn net.Conn) {
+	log.Printf("%s connected, starting file receiving...\n", conn.LocalAddr().String())
 	p := protocol.New(conn)
 	defer p.Close()
 
-	err := p.ReceiveManga(destdir)
+	err := p.ReceiveManga(srv.destDir)
 	if err != nil {
 		log.Printf("Error when receiving manga: %v\n", err)
 	}
@@ -60,6 +109,7 @@ func parseFlags() *Flags {
 func main() {
 	flags := parseFlags()
 
+	// TODO: move handling of pid file to separate functions
 	pidfile, err := os.Create(flags.pidfile)
 	if err != nil {
 		log.Fatalf("Error when creating pid file: %v\n", err)
@@ -78,36 +128,8 @@ func main() {
 		log.Fatalf("Error when writing to pid file: %v\n", err)
 	}
 
-	l, err := net.Listen("tcp", ":"+flags.port)
-	if err != nil {
-		log.Fatalf("Error when starting server: %v\n", err)
+	srv := NewServer(":"+flags.port, flags.destdir)
+	if err := srv.ListenAndServe(); err != nil {
+		log.Fatalf("Error while serving: %v\n", err)
 	}
-	defer l.Close()
-	log.Printf("Listening on %s, destination directory - %s\n", l.Addr().String(), flags.destdir)
-
-	connChan := make(chan net.Conn, 1)
-	go func() {
-		conn, err := l.Accept()
-		if err != nil {
-			// TODO: dont print error if listener is closed when exiting
-			log.Printf("Error when accepting connection: %v\n", err)
-			return
-		}
-		conn.SetDeadline(time.Now().Add(15 * time.Minute))
-		connChan <- conn
-	}()
-
-	exitsig := make(chan os.Signal, 1)
-	signal.Notify(exitsig, syscall.SIGINT, syscall.SIGTERM)
-	select {
-	case conn := <-connChan:
-		log.Printf("%s connected, starting file receiving...\n", conn.LocalAddr().String())
-		handleConnection(conn, flags.destdir)
-	case <-time.After(5 * time.Minute):
-		log.Println("Hit timeout")
-	case <-exitsig:
-		log.Println("Received exit signal.")
-	}
-
-	log.Println("Exiting...")
 }
