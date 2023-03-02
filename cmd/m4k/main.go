@@ -23,7 +23,6 @@ import (
 )
 
 // TODO: add a way to only send file without processing
-// TODO: print merged file size
 
 const (
 	KindlePW5Width  = 1236 // px
@@ -149,14 +148,14 @@ func (cb *ComicBook) FileName() string {
 func (cb *ComicBook) TransformForKindle() error {
 	g := &errgroup.Group{}
 
-    progress := progressbar.Default(int64(len(cb.Pages)), "Transforming pages...")
+	progress := progressbar.Default(int64(len(cb.Pages)), "Transforming pages...")
 	for _, p := range cb.Pages {
 		p := p
 		g.Go(func() error {
 			if err := p.TransformForKindle(); err != nil {
 				return err
 			}
-            progress.Add(1)
+			progress.Add(1)
 			return nil
 		})
 	}
@@ -186,19 +185,19 @@ func (cb *ComicBook) WriteTo(wr io.Writer) (n int64, err error) {
 }
 
 func (cb *ComicBook) fillCbzData() error {
-    buf := new(bytes.Buffer)
-    if _, err := cb.WriteTo(buf); err != nil {
-        return err
-    }
-    cb.cbzData = buf.Bytes()
-    return nil
+	buf := new(bytes.Buffer)
+	if _, err := cb.WriteTo(buf); err != nil {
+		return err
+	}
+	cb.cbzData = buf.Bytes()
+	return nil
 }
 
 func (cb *ComicBook) Reader() (*bytes.Reader, error) {
 	if cb.cbzData == nil {
-        if err := cb.fillCbzData(); err != nil {
-            return nil, err
-        }
+		if err := cb.fillCbzData(); err != nil {
+			return nil, err
+		}
 	}
 
 	return bytes.NewReader(cb.cbzData), nil
@@ -233,10 +232,10 @@ func saveComicBookToFile(path string, cb *ComicBook) error {
 		os.Remove(path)
 		return err
 	}
-    progress := progressbar.DefaultBytes(
-        cbReader.Size(),
-        "saving...",
-    )
+	progress := progressbar.DefaultBytes(
+		cbReader.Size(),
+		"saving...",
+	)
 
 	if _, err = io.Copy(io.MultiWriter(file, progress), cbReader); err != nil {
 		os.Remove(path)
@@ -263,10 +262,10 @@ func sendComicBookToKindle(addr string, cb *ComicBook) error {
 	if err != nil {
 		return err
 	}
-    progress := progressbar.DefaultBytes(
-        cbReader.Size(),
-        "uploading...",
-    )
+	progress := progressbar.DefaultBytes(
+		cbReader.Size(),
+		"uploading...",
+	)
 
 	return p.SendManga(cb.Name, io.TeeReader(cbReader, progress))
 }

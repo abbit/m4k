@@ -31,28 +31,28 @@ func handleConnection(conn net.Conn, destdir string) {
 }
 
 type Flags struct {
-	port string
-    pidfile string
-    destdir string
+	port    string
+	pidfile string
+	destdir string
 }
 
 func parseFlags() *Flags {
 	flags := &Flags{}
 	flag.StringVar(&flags.pidfile, "pidfile", "", "Path to where store pid file")
 	flag.StringVar(&flags.port, "port", "49494", "Port for receiver")
-    flag.StringVar(&flags.destdir, "destdir", "/mnt/us/documents/Manga", "Path destination directory")
+	flag.StringVar(&flags.destdir, "destdir", "/mnt/us/documents/Manga", "Path destination directory")
 	flag.Parse()
 
 	if flags.pidfile == "" {
 		log.Fatalf("-pidfile option is required.\n")
 	}
 
-    absdest, err := filepath.Abs(flags.destdir)
-    if err != nil {
-        log.Fatalf("Error when resolving absolute destination directory path: %v.\n", err)
-    }
+	absdest, err := filepath.Abs(flags.destdir)
+	if err != nil {
+		log.Fatalf("Error when resolving absolute destination directory path: %v.\n", err)
+	}
 
-    flags.destdir = absdest
+	flags.destdir = absdest
 
 	return flags
 }
@@ -89,25 +89,25 @@ func main() {
 	go func() {
 		conn, err := l.Accept()
 		if err != nil {
-            // TODO: dont print error if listener is closed when exiting
+			// TODO: dont print error if listener is closed when exiting
 			log.Printf("Error when accepting connection: %v\n", err)
-            return
+			return
 		}
 		conn.SetDeadline(time.Now().Add(15 * time.Minute))
 		connChan <- conn
 	}()
 
-    exitsig := make(chan os.Signal, 1) 
-    signal.Notify(exitsig, syscall.SIGINT, syscall.SIGTERM)
+	exitsig := make(chan os.Signal, 1)
+	signal.Notify(exitsig, syscall.SIGINT, syscall.SIGTERM)
 	select {
 	case conn := <-connChan:
 		log.Printf("%s connected, starting file receiving...\n", conn.LocalAddr().String())
 		handleConnection(conn, flags.destdir)
 	case <-time.After(5 * time.Minute):
 		log.Println("Hit timeout")
-    case <-exitsig:
-        log.Println("Received exit signal.")
+	case <-exitsig:
+		log.Println("Received exit signal.")
 	}
 
-    log.Println("Exiting...")
+	log.Println("Exiting...")
 }
