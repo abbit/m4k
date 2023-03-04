@@ -50,7 +50,7 @@ func (srv *server) Serve(l net.Listener) error {
 			log.Printf("Error when accepting connection: %v\n", err)
 			return
 		}
-		conn.SetDeadline(time.Now().Add(15 * time.Minute))
+		conn.SetDeadline(time.Now().Add(2 * time.Hour))
 		connChan <- conn
 	}()
 
