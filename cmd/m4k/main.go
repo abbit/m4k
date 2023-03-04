@@ -341,17 +341,17 @@ func main() {
 		}
 	}
 
-	if flags.cleanup {
-		logInfo.Println("Removing merged files...")
-		if err := util.RemoveFiles(cbzFiles); err != nil {
-			logError.Fatalf("while removing merged files: %v\n", err)
-		}
-	}
-
 	if flags.upload {
 		logInfo.Println("Uploading combined file to Kindle...")
 		if err := sendComicBookToKindle(flags.addr, combined); err != nil {
 			logError.Fatalf("while sending to Kindle: %v\n", err)
+		}
+	}
+
+	if flags.cleanup {
+		logInfo.Println("Removing merged files...")
+		if err := util.RemoveFiles(cbzFiles); err != nil {
+			logError.Fatalf("while removing merged files: %v\n", err)
 		}
 	}
 
