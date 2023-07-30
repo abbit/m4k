@@ -17,6 +17,7 @@ import (
 // TODO: wait for clients to close their connections when shutting down gracefully
 // TOOD: measure performance with HTTP
 // TODO: handle multiple connections?
+// TODO: resumable upload?
 
 type server struct {
 	addr    string
