@@ -22,6 +22,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// TODO: add option to slice large images into multiple pages
+// TODO: add support for organizing files into folders
 // TODO: add a way to only send file without processing
 
 const (
@@ -287,10 +289,11 @@ func parseFlags() *Flags {
 	flag.StringVar(&flags.dstdir, "dst", "", "Path to directory to where save merged file (Default: same as srcdir)")
 	flag.BoolVar(&flags.save, "save", false, "Save combined file")
 	flag.BoolVar(&flags.upload, "upload", false, "Upload combined file to Kindle")
-	flag.StringVar(&flags.addr, "addr", "192.168.0.109:49494", "Address (host:port) of Kindle's SSH server")
+	flag.StringVar(&flags.addr, "addr", "", "Address (host or host:port) of Kindle's receiver server. If port is not specified, default 49494 will be used")
 	flag.BoolVar(&flags.cleanup, "cleanup", false, "Remove merged .cbz files")
 	flag.Parse()
 
+	// check if required options are specified
 	if flags.srcdir == "" {
 		logError.Fatalf("-src option is required.\n")
 	}
@@ -300,6 +303,20 @@ func parseFlags() *Flags {
 	if !flags.save && !flags.upload {
 		logError.Fatalf("-save or -upload is required.\n")
 	}
+
+	// check if required options are specified for '-upload' action
+	if flags.upload {
+		if flags.addr == "" {
+			logError.Fatalf("-addr option is required.\n")
+		}
+
+		// add default port if not specified
+		if strings.LastIndex(flags.addr, ":") == -1 {
+			flags.addr += ":49494"
+		}
+	}
+
+	// set default values
 	if flags.dstdir == "" {
 		flags.dstdir = flags.srcdir
 	}
