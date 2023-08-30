@@ -22,9 +22,9 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// TODO: add option to slice large images into multiple pages
 // TODO: add support for organizing files into folders
 // TODO: add a way to only send file without processing
+// TODO: try to fix progressbar blinking
 
 const (
 	KindlePW5Width  = 1236 // px
@@ -87,10 +87,10 @@ func PageFromFile(zfile *zip.File) (*Page, error) {
 }
 
 func (p *Page) FileName() string {
-	return fmt.Sprintf("%06d.%s", p.Number, p.Extension)
+	return fmt.Sprintf("%06d%s", p.Number, p.Extension)
 }
 
-func (p *Page) TransformForKindle() error {
+func (p *Page) TransformForKindle(rotate bool) error {
 	// decode image
 	buf := bytes.NewBuffer(p.Data)
 	img, err := imaging.Decode(buf)
@@ -99,10 +99,21 @@ func (p *Page) TransformForKindle() error {
 	}
 
 	// transform image
+	twopages := false
+	// check if image is in landscape mode
 	if imgsize := img.Bounds().Size(); imgsize.X > imgsize.Y {
-		img = imaging.Rotate90(img) // rotate if Dx > Dy
+		if rotate {
+			img = imaging.Rotate90(img)
+		} else {
+			twopages = true
+		}
 	}
-	img = imaging.Resize(img, KindlePW5Width, KindlePW5Height, imaging.Lanczos)
+	height := KindlePW5Height
+	width := KindlePW5Width
+	if twopages {
+		width *= 2
+	}
+	img = imaging.Resize(img, width, height, imaging.Lanczos)
 	img = imaging.Grayscale(img)
 
 	// encode image
@@ -147,15 +158,15 @@ func (cb *ComicBook) FileName() string {
 	return cb.Name + ".cbz"
 }
 
-func (cb *ComicBook) TransformForKindle() error {
+func (cb *ComicBook) TransformForKindle(rotate bool) error {
 	g := &errgroup.Group{}
 
 	progress := progressbar.Default(int64(len(cb.Pages)), "Transforming pages...")
 	for _, p := range cb.Pages {
 		p := p
 		g.Go(func() error {
-			if err := p.TransformForKindle(); err != nil {
-				return err
+			if err := p.TransformForKindle(rotate); err != nil {
+				return fmt.Errorf("while transforming page %s: %w", p.FileName(), err)
 			}
 			progress.Add(1)
 			return nil
@@ -273,13 +284,14 @@ func sendComicBookToKindle(addr string, cb *ComicBook) error {
 }
 
 type Flags struct {
-	srcdir  string
-	dstdir  string
-	name    string
-	addr    string
-	save    bool
-	upload  bool
-	cleanup bool
+	srcdir     string
+	dstdir     string
+	rotatepage bool
+	name       string
+	addr       string
+	save       bool
+	upload     bool
+	cleanup    bool
 }
 
 func parseFlags() *Flags {
@@ -287,6 +299,7 @@ func parseFlags() *Flags {
 	flag.StringVar(&flags.srcdir, "src", "", "Path to directory with .cbz files")
 	flag.StringVar(&flags.name, "name", "", "Name for combined .cbz file without extension")
 	flag.StringVar(&flags.dstdir, "dst", "", "Path to directory to where save merged file (Default: same as srcdir)")
+	flag.BoolVar(&flags.rotatepage, "rotatepage", false, "Rotate page")
 	flag.BoolVar(&flags.save, "save", false, "Save combined file")
 	flag.BoolVar(&flags.upload, "upload", false, "Upload combined file to Kindle")
 	flag.StringVar(&flags.addr, "addr", "", "Address (host or host:port) of Kindle's receiver server. If port is not specified, default 49494 will be used")
@@ -347,7 +360,7 @@ func main() {
 	combined := mergeComicBooks(comicbooks, flags.name)
 
 	logInfo.Println("Transforming combined file for Kindle...")
-	if err := combined.TransformForKindle(); err != nil {
+	if err := combined.TransformForKindle(flags.rotatepage); err != nil {
 		logError.Fatalf("while transforming pages: %v\n", err)
 	}
 
