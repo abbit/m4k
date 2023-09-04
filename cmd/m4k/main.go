@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,7 +23,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// TODO: add support for organizing files into folders
 // TODO: add a way to only send file without processing
 // TODO: try to fix progressbar blinking
 
@@ -34,13 +34,47 @@ const (
 var logError *log.Logger = log.New(os.Stderr, "Error: ", 0)
 var logInfo *log.Logger = log.New(os.Stdout, "", 0)
 
-type Page struct {
-	Data      []byte
-	Number    uint64
-	Extension string
+type ChapterInfo struct {
+	Name   string
+	Number int
+	Volume int
 }
 
-func PageFromFile(zfile *zip.File) (*Page, error) {
+func ChapterInfoFromName(name string) ChapterInfo {
+	// pattern to capture chapter info (volume number, chapter number, chapter name)
+	re := regexp.MustCompile(`Vol\.(\d+)_Chapter_(\d+)_(.+)`)
+	matches := re.FindStringSubmatch(name)
+	if len(matches) != 4 {
+		return ChapterInfo{}
+	}
+
+	volume, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return ChapterInfo{}
+	}
+
+	number, err := strconv.Atoi(matches[2])
+	if err != nil {
+		return ChapterInfo{}
+	}
+
+	name = strings.ReplaceAll(matches[3], "_", " ")
+
+	return ChapterInfo{
+		Name:   name,
+		Number: number,
+		Volume: volume,
+	}
+}
+
+type Page struct {
+	Data        []byte
+	Number      uint64
+	Extension   string
+	ChapterInfo ChapterInfo
+}
+
+func PageFromFile(zfile *zip.File, chapterInfo ChapterInfo) (*Page, error) {
 	file, err := zfile.Open()
 	if err != nil {
 		return nil, err
@@ -59,14 +93,26 @@ func PageFromFile(zfile *zip.File) (*Page, error) {
 	}
 
 	return &Page{
-		Data:      buf.Bytes(),
-		Number:    number,
-		Extension: filepath.Ext(zfile.Name),
+		Data:        buf.Bytes(),
+		Number:      number,
+		Extension:   filepath.Ext(zfile.Name),
+		ChapterInfo: chapterInfo,
 	}, nil
 }
 
-func (p *Page) FileName() string {
-	return fmt.Sprintf("%06d%s", p.Number, p.Extension)
+func (p *Page) Filepath() string {
+	filename := fmt.Sprintf("%06d%s", p.Number, p.Extension)
+
+	// if chapter info is not available, return just filename
+	if p.ChapterInfo.Name == "" {
+		return filename
+	}
+
+	return filepath.Join(
+		fmt.Sprintf("Volume %d", p.ChapterInfo.Volume),
+		fmt.Sprintf("Chapter %d - %s", p.ChapterInfo.Number, p.ChapterInfo.Name),
+		filename,
+	)
 }
 
 func (p *Page) TransformForKindle(rotate bool) error {
@@ -96,6 +142,7 @@ func (p *Page) TransformForKindle(rotate bool) error {
 	img = imaging.Grayscale(img)
 
 	// encode image
+	buf.Reset()
 	if err = imaging.Encode(buf, img, imaging.JPEG, imaging.JPEGQuality(75)); err != nil {
 		return err
 	}
@@ -117,10 +164,13 @@ func readComicBook(path string) (*ComicBook, error) {
 		return nil, err
 	}
 
+	name := util.WithoutPaddedIndex(util.PathStem(path))
+	chapterInfo := ChapterInfoFromName(name)
+
 	var pages []*Page
 	for _, f := range r.File {
 		if util.IsImage(f.Name) {
-			page, err := PageFromFile(f)
+			page, err := PageFromFile(f, chapterInfo)
 			if err != nil {
 				return nil, err
 			}
@@ -130,7 +180,7 @@ func readComicBook(path string) (*ComicBook, error) {
 	// sort pages by page number
 	sort.Slice(pages, func(i, j int) bool { return pages[i].Number < pages[j].Number })
 
-	return &ComicBook{Pages: pages, Name: util.WithoutPaddedIndex(util.PathStem(path))}, nil
+	return &ComicBook{Pages: pages, Name: name}, nil
 }
 
 func (cb *ComicBook) FileName() string {
@@ -145,7 +195,7 @@ func (cb *ComicBook) TransformForKindle(rotate bool) error {
 		p := p
 		g.Go(func() error {
 			if err := p.TransformForKindle(rotate); err != nil {
-				return fmt.Errorf("while transforming page %s: %w", p.FileName(), err)
+				return fmt.Errorf("while transforming page %s: %w", p.Filepath(), err)
 			}
 			progress.Add(1)
 			return nil
@@ -161,7 +211,7 @@ func (cb *ComicBook) WriteTo(wr io.Writer) (n int64, err error) {
 
 	// write pages to zip archive
 	for _, page := range cb.Pages {
-		file, err := w.Create(page.FileName())
+		file, err := w.Create(page.Filepath())
 		if err != nil {
 			return n, err
 		}
@@ -202,9 +252,10 @@ func mergeComicBooks(comicbooks []*ComicBook, name string) *ComicBook {
 		for _, p := range comicbook.Pages {
 			pageNumber++
 			pages = append(pages, &Page{
-				Data:      p.Data,
-				Extension: p.Extension,
-				Number:    pageNumber,
+				Data:        p.Data,
+				Extension:   p.Extension,
+				Number:      pageNumber,
+				ChapterInfo: p.ChapterInfo,
 			})
 		}
 	}
