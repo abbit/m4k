@@ -34,27 +34,6 @@ const (
 var logError *log.Logger = log.New(os.Stderr, "Error: ", 0)
 var logInfo *log.Logger = log.New(os.Stdout, "", 0)
 
-// returns chapter name without padded index
-func withoutPaddedIndex(name string) string {
-	before, after, found := strings.Cut(name, "_")
-	if found {
-		return after
-	}
-	return before
-}
-
-// checks if file is actual manga page or metadata file
-func isPage(name string) bool {
-	ext := filepath.Ext(name)
-	if ext == ".jpg" ||
-		ext == ".jpeg" ||
-		ext == ".png" {
-		return true
-	}
-
-	return false
-}
-
 type Page struct {
 	Data      []byte
 	Number    uint64
@@ -140,7 +119,7 @@ func readComicBook(path string) (*ComicBook, error) {
 
 	var pages []*Page
 	for _, f := range r.File {
-		if isPage(f.Name) {
+		if util.IsImage(f.Name) {
 			page, err := PageFromFile(f)
 			if err != nil {
 				return nil, err
@@ -151,7 +130,7 @@ func readComicBook(path string) (*ComicBook, error) {
 	// sort pages by page number
 	sort.Slice(pages, func(i, j int) bool { return pages[i].Number < pages[j].Number })
 
-	return &ComicBook{Pages: pages, Name: withoutPaddedIndex(util.PathStem(path))}, nil
+	return &ComicBook{Pages: pages, Name: util.WithoutPaddedIndex(util.PathStem(path))}, nil
 }
 
 func (cb *ComicBook) FileName() string {

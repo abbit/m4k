@@ -37,3 +37,24 @@ func RemoveFiles(paths []string) error {
 	}
 	return nil
 }
+
+// returns chapter name without padded index
+func WithoutPaddedIndex(name string) string {
+	before, after, found := strings.Cut(name, "_")
+	if found {
+		return after
+	}
+	return before
+}
+
+// checks if file is actual manga page or metadata file
+func IsImage(path string) bool {
+	ext := filepath.Ext(path)
+	if ext == ".jpg" ||
+		ext == ".jpeg" ||
+		ext == ".png" {
+		return true
+	}
+
+	return false
+}
