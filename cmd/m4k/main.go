@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,15 +25,16 @@ import (
 )
 
 // TODO: add a way to only send file without processing
-// TODO: try to fix progressbar blinking
 
 const (
 	KindlePW5Width  = 1236 // px
 	KindlePW5Height = 1648 // px
 )
 
-var logError *log.Logger = log.New(os.Stderr, "Error: ", 0)
-var logInfo *log.Logger = log.New(os.Stdout, "", 0)
+var (
+	logError *log.Logger = log.New(os.Stderr, "Error: ", 0)
+	logInfo  *log.Logger = log.New(os.Stdout, "", 0)
+)
 
 type ChapterInfo struct {
 	Name   string
@@ -189,6 +191,9 @@ func (cb *ComicBook) FileName() string {
 
 func (cb *ComicBook) TransformForKindle(rotate bool) error {
 	g := &errgroup.Group{}
+	// limit number of goroutines for image processing to cpu cores - 1
+	// to leave some space for other tasks
+	g.SetLimit(runtime.NumCPU() - 1)
 
 	progress := progressbar.Default(int64(len(cb.Pages)), "Transforming pages...")
 	for _, p := range cb.Pages {
