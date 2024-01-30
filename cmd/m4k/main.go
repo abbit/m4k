@@ -38,24 +38,25 @@ var (
 
 type ChapterInfo struct {
 	Name   string
-	Number int
+	Number float64
 	Volume int
 }
 
 func ChapterInfoFromName(name string) ChapterInfo {
-	// pattern to capture chapter info (volume number, chapter number, chapter name)
-	re := regexp.MustCompile(`Vol\.(\d+)_Chapter_(\d+)_(.+)`)
+	// pattern to capture chapter info (chapter number, volume number, chapter name)
+	// TODO: use config for this
+	re := regexp.MustCompile(`\[(.+)\] Vol\. (\d+) (.+)`)
 	matches := re.FindStringSubmatch(name)
 	if len(matches) != 4 {
 		return ChapterInfo{}
 	}
 
-	volume, err := strconv.Atoi(matches[1])
+	number, err := strconv.ParseFloat(matches[1], 64)
 	if err != nil {
 		return ChapterInfo{}
 	}
 
-	number, err := strconv.Atoi(matches[2])
+	volume, err := strconv.Atoi(matches[2])
 	if err != nil {
 		return ChapterInfo{}
 	}
@@ -111,8 +112,9 @@ func (p *Page) Filepath() string {
 	}
 
 	return filepath.Join(
+		// TODO: use config for this
 		fmt.Sprintf("Volume %d", p.ChapterInfo.Volume),
-		fmt.Sprintf("Chapter %d - %s", p.ChapterInfo.Number, p.ChapterInfo.Name),
+		p.ChapterInfo.Name,
 		filename,
 	)
 }
