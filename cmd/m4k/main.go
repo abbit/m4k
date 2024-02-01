@@ -10,7 +10,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -43,31 +42,30 @@ type ChapterInfo struct {
 }
 
 func ChapterInfoFromName(name string) ChapterInfo {
-	// pattern to capture chapter info (chapter number, volume number, chapter name)
-	// TODO: use config for this
-	re := regexp.MustCompile(`\[(.+)\] Vol\. (\d+) (.+)`)
-	matches := re.FindStringSubmatch(name)
-	if len(matches) != 4 {
-		return ChapterInfo{}
-	}
-
-	number, err := strconv.ParseFloat(matches[1], 64)
-	if err != nil {
-		return ChapterInfo{}
-	}
-
-	volume, err := strconv.Atoi(matches[2])
-	if err != nil {
-		return ChapterInfo{}
-	}
-
-	name = strings.ReplaceAll(matches[3], "_", " ")
-
-	return ChapterInfo{
+	info := ChapterInfo{
 		Name:   name,
-		Number: number,
-		Volume: volume,
+		Volume: 1,
 	}
+
+	numberStr, name, ok := strings.Cut(name, " ")
+	if !ok {
+		return info
+	}
+
+	numberStr = strings.TrimFunc(numberStr, func(r rune) bool {
+		return r == '[' || r == ']'
+	})
+	number, err := strconv.ParseFloat(numberStr, 64)
+	if err != nil {
+		return info
+	}
+
+	name = strings.ReplaceAll(name, "_", " ")
+
+	info.Number = number
+	info.Name = name
+
+	return info
 }
 
 type Page struct {
