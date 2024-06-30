@@ -36,8 +36,13 @@ var (
 )
 
 type ChapterInfo struct {
-	Name   string
+	// Name of chapter
+	// Taken from cbz file name
+	Name string
+	// Number of chapter
+	// Stored as float64 to allow for chapter numbers like 1.5, 2.1, etc
 	Number float64
+	// Volume number
 	Volume int
 }
 
@@ -66,6 +71,17 @@ func ChapterInfoFromName(name string) ChapterInfo {
 	info.Name = name
 
 	return info
+}
+
+func (ci *ChapterInfo) String() string {
+	// if chapter name starts with "Chapter",
+	// it probably already already contains chapter number
+	// so just return it as is
+	if strings.HasPrefix(ci.Name, "Chapter") {
+		return ci.Name
+	}
+	// format chapter name as "Chapter <number> - <name>"
+	return fmt.Sprintf("Chapter %.1f - %s", ci.Number, ci.Name)
 }
 
 type Page struct {
@@ -102,18 +118,15 @@ func PageFromFile(zfile *zip.File, chapterInfo ChapterInfo) (*Page, error) {
 }
 
 func (p *Page) Filepath() string {
-	filename := fmt.Sprintf("%06d%s", p.Number, p.Extension)
-
-	// if chapter info is not available, return just filename
-	if p.ChapterInfo.Name == "" {
-		return filename
-	}
+	// TODO: use config to determine how to format file path
+	volumeDirname := fmt.Sprintf("Volume %d", p.ChapterInfo.Volume)
+	chapterDirname := p.ChapterInfo.String()
+	pageFilename := fmt.Sprintf("%06d%s", p.Number, p.Extension)
 
 	return filepath.Join(
-		// TODO: use config for this
-		fmt.Sprintf("Volume %d", p.ChapterInfo.Volume),
-		p.ChapterInfo.Name,
-		filename,
+		volumeDirname,
+		chapterDirname,
+		pageFilename,
 	)
 }
 
