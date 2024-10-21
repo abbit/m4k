@@ -74,14 +74,17 @@ func ChapterInfoFromName(name string) ChapterInfo {
 }
 
 func (ci *ChapterInfo) String() string {
-	// if chapter name starts with "Chapter",
-	// it probably already already contains chapter number
-	// so just return it as is
+	var name string
 	if strings.HasPrefix(ci.Name, "Chapter") {
-		return ci.Name
+		// if chapter name starts with "Chapter",
+		// it probably already already contains chapter number
+		// so just use name as is
+		name = ci.Name
+	} else {
+		// format chapter name as "Chapter <number> - <name>"
+		name = fmt.Sprintf("Chapter %.1f - %s", ci.Number, ci.Name)
 	}
-	// format chapter name as "Chapter <number> - <name>"
-	return fmt.Sprintf("Chapter %.1f - %s", ci.Number, ci.Name)
+	return name
 }
 
 type Page struct {
