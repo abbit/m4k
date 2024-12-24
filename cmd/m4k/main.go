@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -16,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/abbit/m4k/internal/log"
 	"github.com/abbit/m4k/internal/protocol"
 	"github.com/abbit/m4k/internal/util"
 	"github.com/disintegration/imaging"
@@ -28,11 +28,6 @@ import (
 const (
 	KindlePW5Width  = 1236 // px
 	KindlePW5Height = 1648 // px
-)
-
-var (
-	logError *log.Logger = log.New(os.Stderr, "Error: ", 0)
-	logInfo  *log.Logger = log.New(os.Stdout, "", 0)
 )
 
 type ChapterInfo struct {
@@ -311,15 +306,15 @@ func saveComicBookToFile(path string, cb *ComicBook) error {
 
 // upload comicbook to kindle over sftp
 func sendComicBookToKindle(addr string, cb *ComicBook) error {
-	fmt.Println("Connecting to server...")
+	log.Info.Println("Connecting to server...")
 	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
 	if err != nil {
-		log.Fatalln(err)
+		log.Error.Fatalln(err)
 	}
 	p := protocol.New(conn)
 	defer p.Close()
 
-	fmt.Println("Connected, sending file...")
+	log.Info.Println("Connected, sending file...")
 	conn.SetDeadline(time.Now().Add(10 * time.Minute))
 
 	cbReader, err := cb.Reader()
@@ -359,19 +354,19 @@ func parseFlags() *Flags {
 
 	// check if required options are specified
 	if flags.srcdir == "" {
-		logError.Fatalf("-src option is required.\n")
+		log.Error.Fatalf("-src option is required.\n")
 	}
 	if flags.name == "" {
-		logError.Fatalf("-name option is required.\n")
+		log.Error.Fatalf("-name option is required.\n")
 	}
 	if !flags.save && !flags.upload {
-		logError.Fatalf("-save or -upload is required.\n")
+		log.Error.Fatalf("-save or -upload is required.\n")
 	}
 
 	// check if required options are specified for '-upload' action
 	if flags.upload {
 		if flags.addr == "" {
-			logError.Fatalf("-addr option is required.\n")
+			log.Error.Fatalf("-addr option is required.\n")
 		}
 
 		// add default port if not specified
@@ -391,50 +386,50 @@ func parseFlags() *Flags {
 func main() {
 	flags := parseFlags()
 
-	logInfo.Println("Searching cbz files...")
+	log.Info.Println("Searching cbz files...")
 	cbzFiles, err := util.FindFilesWithExt(flags.srcdir, ".cbz")
 	if err != nil {
-		logError.Fatalf("%v\n", err)
+		log.Error.Fatalf("%v\n", err)
 	}
 
-	logInfo.Println("Reading cbz files...")
+	log.Info.Println("Reading cbz files...")
 	var comicbooks []*ComicBook
 	for _, f := range cbzFiles {
 		cb, err := readComicBook(f)
 		if err != nil {
-			logError.Fatalf("failed reading comicbook from path %s: %v\n", f, err)
+			log.Error.Fatalf("failed reading comicbook from path %s: %v\n", f, err)
 		}
 		comicbooks = append(comicbooks, cb)
 	}
 
-	logInfo.Println("Merging cbz files...")
+	log.Info.Println("Merging cbz files...")
 	combined := mergeComicBooks(comicbooks, flags.name)
 
-	logInfo.Println("Transforming combined file for Kindle...")
+	log.Info.Println("Transforming combined file for Kindle...")
 	if err := combined.TransformForKindle(flags.rotatepage); err != nil {
-		logError.Fatalf("while transforming pages: %v\n", err)
+		log.Error.Fatalf("while transforming pages: %v\n", err)
 	}
 
 	if flags.save {
-		logInfo.Println("Saving combined file...")
+		log.Info.Println("Saving combined file...")
 		if err := saveComicBookToFile(flags.dstdir, combined); err != nil {
-			logError.Fatalf("while saving combined file: %v\n", err)
+			log.Error.Fatalf("while saving combined file: %v\n", err)
 		}
 	}
 
 	if flags.upload {
-		logInfo.Println("Uploading combined file to Kindle...")
+		log.Info.Println("Uploading combined file to Kindle...")
 		if err := sendComicBookToKindle(flags.addr, combined); err != nil {
-			logError.Fatalf("while sending to Kindle: %v\n", err)
+			log.Error.Fatalf("while sending to Kindle: %v\n", err)
 		}
 	}
 
 	if flags.cleanup {
-		logInfo.Println("Removing merged files...")
+		log.Info.Println("Removing merged files...")
 		if err := util.RemoveFiles(cbzFiles); err != nil {
-			logError.Fatalf("while removing merged files: %v\n", err)
+			log.Error.Fatalf("while removing merged files: %v\n", err)
 		}
 	}
 
-	logInfo.Println("Done!")
+	log.Info.Println("Done!")
 }
