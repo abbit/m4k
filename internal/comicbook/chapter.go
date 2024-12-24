@@ -17,8 +17,8 @@ type ChapterInfo struct {
 	Volume int
 }
 
-func ChapterInfoFromName(name string) ChapterInfo {
-	info := ChapterInfo{
+func ChapterInfoFromName(name string) *ChapterInfo {
+	info := &ChapterInfo{
 		Name:   name,
 		Volume: 1,
 	}

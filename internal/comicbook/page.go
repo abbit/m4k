@@ -14,10 +14,10 @@ type Page struct {
 	Data        []byte
 	Number      uint64
 	Extension   string
-	ChapterInfo ChapterInfo
+	ChapterInfo *ChapterInfo
 }
 
-func PageFromFile(zfile *zip.File, chapterInfo ChapterInfo) (*Page, error) {
+func PageFromFile(zfile *zip.File, chapterInfo *ChapterInfo) (*Page, error) {
 	file, err := zfile.Open()
 	if err != nil {
 		return nil, err
