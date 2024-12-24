@@ -15,40 +15,40 @@ const (
 )
 
 var (
-	ErrZeroWidthHeight    = fmt.Errorf("width and height must be greater than 0")
-	ErrInvalidJpegQuality = fmt.Errorf("jpeg quality must be between 1 and 100")
+	ErrZeroWidthHeight = fmt.Errorf("width and height must be greater than 0")
+	ErrNoEncoding      = fmt.Errorf("encoding must be specified")
 )
 
 type Options struct {
-	Rotate        bool
+	// required
+
 	Width, Height int
-	JpegQuality   int
+	Encoding      string
+
+	// optional
+
+	Rotate      bool
+	JpegQuality int
 	// Callback to be called after page transformation
 	Callback func()
 }
 
-func TransformPage(p *comicbook.Page, opts Options) error {
+func TransformImage(data []byte, opts *Options) ([]byte, error) {
 	width, height := opts.Width, opts.Height
-	jpegQuality := opts.JpegQuality
-	if jpegQuality == 0 {
-		jpegQuality = defaultJpegQuality
-	}
-
-	// validate options
 
 	if width <= 0 || height <= 0 {
-		return ErrZeroWidthHeight
+		return nil, ErrZeroWidthHeight
 	}
 
-	if jpegQuality < 1 || jpegQuality > 100 {
-		return ErrInvalidJpegQuality
+	if len(opts.Encoding) == 0 {
+		return nil, ErrNoEncoding
 	}
 
 	// decode image
-	buf := bytes.NewBuffer(p.Data)
+	buf := bytes.NewBuffer(data)
 	img, err := imaging.Decode(buf)
 	if err != nil {
-		return fmt.Errorf("while decoding image: %w", err)
+		return nil, fmt.Errorf("while decoding image: %w", err)
 	}
 
 	// transform image
@@ -69,22 +69,45 @@ func TransformPage(p *comicbook.Page, opts Options) error {
 
 	// encode image
 	buf.Reset()
-	if err = imaging.Encode(buf, img, imaging.JPEG, imaging.JPEGQuality(jpegQuality)); err != nil {
-		return fmt.Errorf("while encoding image: %w", err)
+	switch opts.Encoding {
+	case "png":
+		err = imaging.Encode(buf, img, imaging.PNG)
+	case "jpeg", "jpg":
+		jpegQuality := opts.JpegQuality
+		if jpegQuality == 0 {
+			jpegQuality = defaultJpegQuality
+		}
+		err = imaging.Encode(buf, img, imaging.JPEG, imaging.JPEGQuality(jpegQuality))
+	default:
+		err = fmt.Errorf("unsupported encoding: %s", opts.Encoding)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("while encoding image: %w", err)
 	}
 
-	// update page
-	p.Data = buf.Bytes()
-	p.Extension = ".jpg"
-
+	// call callback
 	if opts.Callback != nil {
 		opts.Callback()
 	}
 
+	return buf.Bytes(), nil
+}
+
+func TransformPage(p *comicbook.Page, opts *Options) error {
+	// transform page image
+	transformed, err := TransformImage(p.Data, opts)
+	if err != nil {
+		return fmt.Errorf("while transforming image: %w", err)
+	}
+
+	// update page
+	p.Data = transformed
+	p.Extension = "." + opts.Encoding
+
 	return nil
 }
 
-func TransformComicBook(cb *comicbook.ComicBook, opts Options) error {
+func TransformComicBook(cb *comicbook.ComicBook, opts *Options) error {
 	eg := &errgroup.Group{}
 	// limit number of goroutines for image processing to cpu cores - 1
 	// to leave some space for other tasks

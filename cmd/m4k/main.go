@@ -152,10 +152,11 @@ func main() {
 
 	log.Info.Println("Transforming combined file for Kindle...")
 	progress := progressbar.Default(int64(len(combined.Pages)), "Transforming pages...")
-	transformOpts := transform.Options{
+	transformOpts := &transform.Options{
 		Rotate:   flags.rotatepage,
 		Width:    KindlePW5Width,
 		Height:   KindlePW5Height,
+		Encoding: "jpg",
 		Callback: func() { progress.Add(1) },
 	}
 	if err := transform.TransformComicBook(combined, transformOpts); err != nil {
