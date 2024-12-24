@@ -1,285 +1,30 @@
 package main
 
 import (
-	"archive/zip"
-	"bytes"
 	"flag"
-	"fmt"
 	"io"
 	"net"
 	"os"
 	"path/filepath"
-	"runtime"
-	"sort"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/abbit/m4k/internal/comicbook"
 	"github.com/abbit/m4k/internal/log"
 	"github.com/abbit/m4k/internal/protocol"
+	"github.com/abbit/m4k/internal/transform"
 	"github.com/abbit/m4k/internal/util"
-	"github.com/disintegration/imaging"
 	"github.com/schollz/progressbar/v3"
-	"golang.org/x/sync/errgroup"
 )
-
-// TODO: add a way to only send file without processing
 
 const (
 	KindlePW5Width  = 1236 // px
 	KindlePW5Height = 1648 // px
 )
 
-type ChapterInfo struct {
-	// Name of chapter
-	// Taken from cbz file name
-	Name string
-	// Number of chapter
-	// Stored as float64 to allow for chapter numbers like 1.5, 2.1, etc
-	Number float64
-	// Volume number
-	Volume int
-}
+// TODO: add a way to only send file without processing
 
-func ChapterInfoFromName(name string) ChapterInfo {
-	info := ChapterInfo{
-		Name:   name,
-		Volume: 1,
-	}
-
-	numberStr, name, ok := strings.Cut(name, " ")
-	if !ok {
-		return info
-	}
-
-	numberStr = strings.TrimFunc(numberStr, func(r rune) bool {
-		return r == '[' || r == ']'
-	})
-	number, err := strconv.ParseFloat(numberStr, 64)
-	if err != nil {
-		return info
-	}
-
-	name = strings.ReplaceAll(name, "_", " ")
-
-	info.Number = number
-	info.Name = name
-
-	return info
-}
-
-func (ci *ChapterInfo) String() string {
-	var name string
-	if strings.HasPrefix(ci.Name, "Chapter") {
-		// if chapter name starts with "Chapter",
-		// it probably already already contains chapter number
-		// so just use name as is
-		name = ci.Name
-	} else {
-		// format chapter name as "Chapter <number> - <name>"
-		name = fmt.Sprintf("Chapter %.1f - %s", ci.Number, ci.Name)
-	}
-	return name
-}
-
-type Page struct {
-	Data        []byte
-	Number      uint64
-	Extension   string
-	ChapterInfo ChapterInfo
-}
-
-func PageFromFile(zfile *zip.File, chapterInfo ChapterInfo) (*Page, error) {
-	file, err := zfile.Open()
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var buf bytes.Buffer
-	_, err = buf.ReadFrom(file)
-	if err != nil {
-		return nil, err
-	}
-
-	number, err := strconv.ParseUint(util.PathStem(zfile.Name), 10, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Page{
-		Data:        buf.Bytes(),
-		Number:      number,
-		Extension:   filepath.Ext(zfile.Name),
-		ChapterInfo: chapterInfo,
-	}, nil
-}
-
-func (p *Page) Filepath() string {
-	// TODO: use config to determine how to format file path
-	volumeDirname := fmt.Sprintf("Volume %d", p.ChapterInfo.Volume)
-	chapterDirname := p.ChapterInfo.String()
-	pageFilename := fmt.Sprintf("%06d%s", p.Number, p.Extension)
-
-	return filepath.Join(
-		volumeDirname,
-		chapterDirname,
-		pageFilename,
-	)
-}
-
-func (p *Page) TransformForKindle(rotate bool) error {
-	// decode image
-	buf := bytes.NewBuffer(p.Data)
-	img, err := imaging.Decode(buf)
-	if err != nil {
-		return err
-	}
-
-	// transform image
-	twopages := false
-	// check if image is in landscape mode
-	if imgsize := img.Bounds().Size(); imgsize.X > imgsize.Y {
-		if rotate {
-			img = imaging.Rotate90(img)
-		} else {
-			twopages = true
-		}
-	}
-	height := KindlePW5Height
-	width := KindlePW5Width
-	if twopages {
-		width *= 2
-	}
-	img = imaging.Resize(img, width, height, imaging.Lanczos)
-	img = imaging.Grayscale(img)
-
-	// encode image
-	buf.Reset()
-	if err = imaging.Encode(buf, img, imaging.JPEG, imaging.JPEGQuality(75)); err != nil {
-		return err
-	}
-	p.Data = buf.Bytes()
-	p.Extension = ".jpg"
-
-	return nil
-}
-
-type ComicBook struct {
-	Pages   []*Page
-	Name    string
-	cbzData []byte
-}
-
-func readComicBook(path string) (*ComicBook, error) {
-	r, err := zip.OpenReader(path)
-	if err != nil {
-		return nil, err
-	}
-
-	name := util.WithoutPaddedIndex(util.PathStem(path))
-	chapterInfo := ChapterInfoFromName(name)
-
-	var pages []*Page
-	for _, f := range r.File {
-		if util.IsImage(f.Name) {
-			page, err := PageFromFile(f, chapterInfo)
-			if err != nil {
-				return nil, err
-			}
-			pages = append(pages, page)
-		}
-	}
-	// sort pages by page number
-	sort.Slice(pages, func(i, j int) bool { return pages[i].Number < pages[j].Number })
-
-	return &ComicBook{Pages: pages, Name: name}, nil
-}
-
-func (cb *ComicBook) FileName() string {
-	return cb.Name + ".cbz"
-}
-
-func (cb *ComicBook) TransformForKindle(rotate bool) error {
-	g := &errgroup.Group{}
-	// limit number of goroutines for image processing to cpu cores - 1
-	// to leave some space for other tasks
-	g.SetLimit(runtime.NumCPU() - 1)
-
-	progress := progressbar.Default(int64(len(cb.Pages)), "Transforming pages...")
-	for _, p := range cb.Pages {
-		p := p
-		g.Go(func() error {
-			if err := p.TransformForKindle(rotate); err != nil {
-				return fmt.Errorf("while transforming page %s: %w", p.Filepath(), err)
-			}
-			progress.Add(1)
-			return nil
-		})
-	}
-
-	return g.Wait()
-}
-
-func (cb *ComicBook) WriteTo(wr io.Writer) (n int64, err error) {
-	w := zip.NewWriter(wr)
-	defer w.Close()
-
-	// write pages to zip archive
-	for _, page := range cb.Pages {
-		file, err := w.Create(page.Filepath())
-		if err != nil {
-			return n, err
-		}
-
-		nfile, err := file.Write(page.Data)
-		n += int64(nfile)
-		if err != nil {
-			return n, err
-		}
-	}
-
-	return
-}
-
-func (cb *ComicBook) fillCbzData() error {
-	buf := new(bytes.Buffer)
-	if _, err := cb.WriteTo(buf); err != nil {
-		return err
-	}
-	cb.cbzData = buf.Bytes()
-	return nil
-}
-
-func (cb *ComicBook) Reader() (*bytes.Reader, error) {
-	if cb.cbzData == nil {
-		if err := cb.fillCbzData(); err != nil {
-			return nil, err
-		}
-	}
-
-	return bytes.NewReader(cb.cbzData), nil
-}
-
-func mergeComicBooks(comicbooks []*ComicBook, name string) *ComicBook {
-	var pages []*Page
-	pageNumber := uint64(0)
-	for _, comicbook := range comicbooks {
-		for _, p := range comicbook.Pages {
-			pageNumber++
-			pages = append(pages, &Page{
-				Data:        p.Data,
-				Extension:   p.Extension,
-				Number:      pageNumber,
-				ChapterInfo: p.ChapterInfo,
-			})
-		}
-	}
-
-	return &ComicBook{Name: name, Pages: pages}
-}
-
-func saveComicBookToFile(path string, cb *ComicBook) error {
+func saveComicBookToFile(path string, cb *comicbook.ComicBook) error {
 	file, err := os.Create(filepath.Join(path, cb.FileName()))
 	if err != nil {
 		return err
@@ -305,7 +50,7 @@ func saveComicBookToFile(path string, cb *ComicBook) error {
 }
 
 // upload comicbook to kindle over sftp
-func sendComicBookToKindle(addr string, cb *ComicBook) error {
+func sendComicBookToKindle(addr string, cb *comicbook.ComicBook) error {
 	log.Info.Println("Connecting to server...")
 	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
 	if err != nil {
@@ -393,20 +138,27 @@ func main() {
 	}
 
 	log.Info.Println("Reading cbz files...")
-	var comicbooks []*ComicBook
-	for _, f := range cbzFiles {
-		cb, err := readComicBook(f)
+	var comicbooks []*comicbook.ComicBook
+	for _, path := range cbzFiles {
+		cb, err := comicbook.ReadComicBook(path)
 		if err != nil {
-			log.Error.Fatalf("failed reading comicbook from path %s: %v\n", f, err)
+			log.Error.Fatalf("failed reading comicbook from path %s: %v\n", path, err)
 		}
 		comicbooks = append(comicbooks, cb)
 	}
 
 	log.Info.Println("Merging cbz files...")
-	combined := mergeComicBooks(comicbooks, flags.name)
+	combined := comicbook.MergeComicBooks(comicbooks, flags.name)
 
 	log.Info.Println("Transforming combined file for Kindle...")
-	if err := combined.TransformForKindle(flags.rotatepage); err != nil {
+	progress := progressbar.Default(int64(len(combined.Pages)), "Transforming pages...")
+	transformOpts := transform.Options{
+		Rotate:   flags.rotatepage,
+		Width:    KindlePW5Width,
+		Height:   KindlePW5Height,
+		Callback: func() { progress.Add(1) },
+	}
+	if err := transform.TransformComicBook(combined, transformOpts); err != nil {
 		log.Error.Fatalf("while transforming pages: %v\n", err)
 	}
 
