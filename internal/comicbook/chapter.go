@@ -28,6 +28,8 @@ func ChapterInfoFromName(name string) ChapterInfo {
 		return info
 	}
 
+	// NOTE: chapter number parsing from path for now is closely tied to how `mangal` saves them
+
 	numberStr = strings.TrimFunc(numberStr, func(r rune) bool {
 		return r == '[' || r == ']'
 	})
