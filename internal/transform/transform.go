@@ -10,19 +10,38 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var ErrZeroWidthHeight = fmt.Errorf("width and height must be greater than 0")
+const (
+	defaultJpegQuality = 75
+)
+
+var (
+	ErrZeroWidthHeight    = fmt.Errorf("width and height must be greater than 0")
+	ErrInvalidJpegQuality = fmt.Errorf("jpeg quality must be between 1 and 100")
+)
 
 type Options struct {
 	Rotate        bool
 	Width, Height int
-	Callback      func()
+	JpegQuality   int
+	// Callback to be called after page transformation
+	Callback func()
 }
 
 func TransformPage(p *comicbook.Page, opts Options) error {
 	width, height := opts.Width, opts.Height
+	jpegQuality := opts.JpegQuality
+	if jpegQuality == 0 {
+		jpegQuality = defaultJpegQuality
+	}
+
+	// validate options
 
 	if width <= 0 || height <= 0 {
 		return ErrZeroWidthHeight
+	}
+
+	if jpegQuality < 1 || jpegQuality > 100 {
+		return ErrInvalidJpegQuality
 	}
 
 	// decode image
@@ -50,7 +69,7 @@ func TransformPage(p *comicbook.Page, opts Options) error {
 
 	// encode image
 	buf.Reset()
-	if err = imaging.Encode(buf, img, imaging.JPEG, imaging.JPEGQuality(75)); err != nil {
+	if err = imaging.Encode(buf, img, imaging.JPEG, imaging.JPEGQuality(jpegQuality)); err != nil {
 		return fmt.Errorf("while encoding image: %w", err)
 	}
 
@@ -58,27 +77,28 @@ func TransformPage(p *comicbook.Page, opts Options) error {
 	p.Data = buf.Bytes()
 	p.Extension = ".jpg"
 
+	if opts.Callback != nil {
+		opts.Callback()
+	}
+
 	return nil
 }
 
 func TransformComicBook(cb *comicbook.ComicBook, opts Options) error {
-	g := &errgroup.Group{}
+	eg := &errgroup.Group{}
 	// limit number of goroutines for image processing to cpu cores - 1
 	// to leave some space for other tasks
-	g.SetLimit(runtime.NumCPU() - 1)
+	eg.SetLimit(runtime.NumCPU() - 1)
 
 	for _, p := range cb.Pages {
 		p := p
-		g.Go(func() error {
+		eg.Go(func() error {
 			if err := TransformPage(p, opts); err != nil {
 				return fmt.Errorf("while transforming page %s: %w", p.Filepath(), err)
-			}
-			if opts.Callback != nil {
-				opts.Callback()
 			}
 			return nil
 		})
 	}
 
-	return g.Wait()
+	return eg.Wait()
 }
