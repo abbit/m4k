@@ -107,7 +107,8 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	cbzfile, err := transformCBZ(chaptersDir, "result.cbz")
+	filename := formatMangaTitle(params)
+	cbzfile, err := transformCBZ(chaptersDir, filename)
 	if err != nil {
 		resultErr = fmt.Errorf("reading cbz file: %w", err)
 		return
@@ -119,10 +120,10 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.ServeContent(w, r, "data.cbz", time.Time{}, cbzReader)
+	http.ServeContent(w, r, cbzfile.FileName(), time.Time{}, cbzReader)
 }
 
-func transformCBZ(srcdir, filename string) (*comicbook.ComicBook, error) {
+func transformCBZ(srcdir, mergedFileName string) (*comicbook.ComicBook, error) {
 	log.Info.Println("Searching cbz files...")
 	cbzFiles, err := util.FindFilesWithExt(srcdir, ".cbz")
 	if err != nil {
@@ -140,7 +141,7 @@ func transformCBZ(srcdir, filename string) (*comicbook.ComicBook, error) {
 	}
 
 	log.Info.Println("Merging cbz files...")
-	combined := comicbook.MergeComicBooks(comicbooks, filename)
+	combined := comicbook.MergeComicBooks(comicbooks, mergedFileName)
 
 	log.Info.Println("Transforming combined file for Kindle...")
 	transformOpts := &transform.Options{
@@ -151,6 +152,8 @@ func transformCBZ(srcdir, filename string) (*comicbook.ComicBook, error) {
 	if err := transform.TransformComicBook(combined, transformOpts); err != nil {
 		return nil, fmt.Errorf("transforming pages: %w", err)
 	}
+
+	log.Info.Println("Done transforming CBZ")
 
 	return combined, nil
 }

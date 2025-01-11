@@ -32,7 +32,7 @@ func (s *Server) mangaChaptersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	title := fmt.Sprintf("%s %s %s", params.Manga, params.Volume, formatChaptersRange(params.ChaptersRange))
+	title := formatMangaTitle(params)
 	chaptersRangeFeed := opds.Feed{
 		ID:          r.RequestURI,
 		Title:       title,

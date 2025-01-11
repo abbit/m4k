@@ -41,7 +41,7 @@ func ReadComicBook(path string) (*ComicBook, error) {
 }
 
 func (cb *ComicBook) FileName() string {
-	return cb.Name + ".cbz"
+	return util.SanitizePath(cb.Name) + ".cbz"
 }
 
 func (cb *ComicBook) WriteTo(wr io.Writer) (n int64, err error) {
