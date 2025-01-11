@@ -1,0 +1,5 @@
+- OPDS server: serve metadata for Manga
+- Koreader OPDS Browser: modify for applying custom title to search button
+- Koreader OPDS Browser: modify for not appending author to filename if there is no author found
+- Koreader OPDS Browser: modify for showing error text 
+- Koreader OPDS Browser: modify to show covers
