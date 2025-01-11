@@ -53,7 +53,7 @@ func (s *Server) mangaChaptersHandler(w http.ResponseWriter, r *http.Request) {
 					{
 						Rel:   opds.RelAcquisition,
 						Type:  opds.FileTypeCBZ,
-						Href:  fmt.Sprintf("/opds/%s/%s/%s/%s/download?format=cbz&for=kindle", params.Provider, params.MangaEncoded, params.Volume, params.ChaptersRangeStr),
+						Href:  fmt.Sprintf("/opds/%s/%s/%s/download?format=cbz&for=kindle", params.Provider, params.MangaEncoded, params.ChaptersRangeStr),
 						Title: "cbz",
 					},
 				},

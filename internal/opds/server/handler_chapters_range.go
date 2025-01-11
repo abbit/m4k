@@ -25,7 +25,7 @@ func (s *Server) chaptersRangeHandler(w http.ResponseWriter, r *http.Request) {
 
 	volumeFeed := opds.Feed{
 		ID:          r.RequestURI,
-		Title:       fmt.Sprintf("Enter %s %s chapters range", params.Manga, params.Volume),
+		Title:       fmt.Sprintf("Enter %s chapters range", params.Manga),
 		LastUpdated: opds.TimeNow(),
 		Links: []opds.Link{
 			linkStart(),
@@ -33,7 +33,7 @@ func (s *Server) chaptersRangeHandler(w http.ResponseWriter, r *http.Request) {
 			{
 				Rel:  opds.RelSearch,
 				Type: opds.FeedTypeAcquisition,
-				Href: fmt.Sprintf("/opds/%s/%s/%s/{searchTerms}", params.Provider, params.MangaEncoded, params.Volume),
+				Href: fmt.Sprintf("/opds/%s/%s/{searchTerms}", params.Provider, params.MangaEncoded),
 			},
 		},
 	}

@@ -13,7 +13,6 @@ type params struct {
 	Client           *libmangal.Client
 	MangaEncoded     string
 	Manga            mangadata.Manga
-	Volume           string
 	ChaptersRangeStr string
 	ChaptersRange    []int
 }
@@ -42,13 +41,6 @@ func (s *Server) parseRequestParams(r *http.Request) (*params, error) {
 	}
 	p.MangaEncoded = mangaEncoded
 	p.Manga = manga
-
-	// TODO: handle Volume string with space
-	volume := r.PathValue("volume")
-	if len(volume) == 0 {
-		return p, nil
-	}
-	p.Volume = volume
 
 	chaptersRangeStr := r.PathValue("chapters_range")
 	if len(chaptersRangeStr) == 0 {

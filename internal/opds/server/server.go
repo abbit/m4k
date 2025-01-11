@@ -38,10 +38,9 @@ func New(
 	mux.HandleFunc("GET /opds", s.providersHandler)
 	mux.HandleFunc("GET /opds/{provider}", s.searchMangaHandler)
 	mux.HandleFunc("GET /opds/{provider}/search", s.searchResultsHandler)
-	mux.HandleFunc("GET /opds/{provider}/{manga}", s.mangaVolumesHandler)
-	mux.HandleFunc("GET /opds/{provider}/{manga}/{volume}", s.chaptersRangeHandler)
-	mux.HandleFunc("GET /opds/{provider}/{manga}/{volume}/{chapters_range}", s.mangaChaptersHandler)
-	mux.HandleFunc("GET /opds/{provider}/{manga}/{volume}/{chapters_range}/download", s.downloadHandler)
+	mux.HandleFunc("GET /opds/{provider}/{manga}", s.chaptersRangeHandler)
+	mux.HandleFunc("GET /opds/{provider}/{manga}/{chapters_range}", s.mangaChaptersHandler)
+	mux.HandleFunc("GET /opds/{provider}/{manga}/{chapters_range}/download", s.downloadHandler)
 
 	s.handler = mux
 	s.handler = logRequestMiddleware(s.handler)

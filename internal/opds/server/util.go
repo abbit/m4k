@@ -104,5 +104,5 @@ func formatChaptersRange(chaptersRange []int) string {
 }
 
 func formatMangaTitle(params *params) string {
-	return fmt.Sprintf("%s %s %s", params.Manga, params.Volume, formatChaptersRange(params.ChaptersRange))
+	return fmt.Sprintf("%s %s", params.Manga, formatChaptersRange(params.ChaptersRange))
 }
