@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +15,10 @@ import (
 	"github.com/abbit/m4k/internal/transform"
 	"github.com/abbit/m4k/internal/util"
 	"github.com/luevano/libmangal"
+)
+
+const (
+	baseDirName = "m4k-opds-server"
 )
 
 const (
@@ -54,18 +59,28 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chaptersDir, err := os.MkdirTemp("", "m4k-opds-server")
-	if err != nil {
-		resultErr = fmt.Errorf("create tempdir: %w", err)
-		return
+	baseDirPath := path.Join(os.TempDir(), baseDirName)
+
+	// check if the directory exists, create it if not
+	if _, err := os.Stat(baseDirPath); os.IsNotExist(err) {
+		if err := os.Mkdir(baseDirPath, os.ModePerm); err != nil {
+			resultErr = fmt.Errorf("creating base dir: %w", err)
+			return
+		}
 	}
-	log.Info.Println("Saving to:", chaptersDir)
+
+	log.Info.Println("Saving to:", baseDirPath)
 
 	downloadOptions := libmangal.DownloadOptions{
-		Format:           libmangal.FormatCBZ,
-		Directory:        chaptersDir,
-		ImageTransformer: func(data []byte) ([]byte, error) { return data, nil },
+		Format:            libmangal.FormatCBZ,
+		Directory:         baseDirPath,
+		CreateProviderDir: true,
+		CreateMangaDir:    true,
+		SkipIfExists:      true,
+		ImageTransformer:  func(data []byte) ([]byte, error) { return data, nil },
 	}
+
+	var resultsDir string
 
 	// FIX: rework this mess
 	// TODO: make configurable
@@ -74,7 +89,7 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 		retry := true
 		for retry {
 			retry = false
-			_, err := params.Client.DownloadChapter(ctx, chapter, downloadOptions)
+			res, err := params.Client.DownloadChapter(ctx, chapter, downloadOptions)
 			if err != nil {
 				errMsg := err.Error()
 				// TODO: handle other responses here too if possible
@@ -104,11 +119,13 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 				resultErr = fmt.Errorf("downloading chapter: %w", err)
 				return
 			}
+
+			resultsDir = res.Directory
 		}
 	}
 
 	filename := formatMangaTitle(params)
-	cbzfile, err := transformCBZ(chaptersDir, filename)
+	cbzfile, err := transformCBZ(resultsDir, filename)
 	if err != nil {
 		resultErr = fmt.Errorf("reading cbz file: %w", err)
 		return
@@ -119,6 +136,8 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 		resultErr = fmt.Errorf("creating cbz reader: %w", err)
 		return
 	}
+
+	// TODO: save result on disk?
 
 	http.ServeContent(w, r, cbzfile.FileName(), time.Time{}, cbzReader)
 }
