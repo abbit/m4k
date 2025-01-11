@@ -108,10 +108,10 @@ func TransformPage(p *comicbook.Page, opts *Options) error {
 }
 
 func TransformComicBook(cb *comicbook.ComicBook, opts *Options) error {
-	eg := &errgroup.Group{}
+	var eg errgroup.Group
 	// limit number of goroutines for image processing to cpu cores - 1
 	// to leave some space for other tasks
-	eg.SetLimit(runtime.NumCPU() - 1)
+	eg.SetLimit(max(1, runtime.NumCPU()-1))
 
 	for _, p := range cb.Pages {
 		p := p

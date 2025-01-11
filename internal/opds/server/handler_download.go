@@ -127,7 +127,7 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 	filename := formatMangaTitle(params)
 	cbzfile, err := transformCBZ(resultsDir, filename)
 	if err != nil {
-		resultErr = fmt.Errorf("reading cbz file: %w", err)
+		resultErr = fmt.Errorf("transforming cbz file: %w", err)
 		return
 	}
 
