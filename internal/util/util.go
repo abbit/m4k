@@ -5,6 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
+)
+
+const (
+	invalidPathChars = `/:`
 )
 
 // returns file name without extension
@@ -57,4 +62,33 @@ func IsImage(path string) bool {
 	}
 
 	return false
+}
+
+func SanitizePath(path string) string {
+	var (
+		sanitized strings.Builder
+		prev      rune
+	)
+
+	const underscore = '_'
+
+	for _, r := range path {
+		var toWrite rune
+		if strings.ContainsRune(invalidPathChars, r) {
+			toWrite = underscore
+		} else {
+			toWrite = r
+		}
+
+		// replace two or more consecutive underscores with one underscore
+		if (toWrite == underscore && prev != underscore) || toWrite != underscore {
+			sanitized.WriteRune(toWrite)
+		}
+
+		prev = toWrite
+	}
+
+	return strings.TrimFunc(sanitized.String(), func(r rune) bool {
+		return r == underscore || unicode.IsSpace(r)
+	})
 }
