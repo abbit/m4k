@@ -66,8 +66,8 @@ func (cb *ComicBook) WriteTo(wr io.Writer) (n int64, err error) {
 }
 
 func (cb *ComicBook) fillCbzData() error {
-	buf := new(bytes.Buffer)
-	if _, err := cb.WriteTo(buf); err != nil {
+	var buf bytes.Buffer
+	if _, err := cb.WriteTo(&buf); err != nil {
 		return err
 	}
 	cb.cbzData = buf.Bytes()
@@ -75,7 +75,7 @@ func (cb *ComicBook) fillCbzData() error {
 }
 
 func (cb *ComicBook) Reader() (*bytes.Reader, error) {
-	if cb.cbzData == nil {
+	if len(cb.cbzData) == 0 {
 		if err := cb.fillCbzData(); err != nil {
 			return nil, err
 		}
