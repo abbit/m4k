@@ -23,7 +23,7 @@ func (s *Server) searchMangaHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	providerFeed := opds.Feed{
+	searchFeed := opds.Feed{
 		ID:          r.RequestURI,
 		Title:       params.Provider,
 		LastUpdated: opds.TimeNow(),
@@ -38,7 +38,7 @@ func (s *Server) searchMangaHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	if err := writeXML(w, providerFeed); err != nil {
+	if err := writeXML(w, searchFeed); err != nil {
 		resultErr = fmt.Errorf("writing response: %w", err)
 	}
 }

@@ -23,7 +23,7 @@ func (s *Server) chaptersRangeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	volumeFeed := opds.Feed{
+	chaptersRangeFeed := opds.Feed{
 		ID:          r.RequestURI,
 		Title:       fmt.Sprintf("Enter %s chapters range", params.Manga),
 		LastUpdated: opds.TimeNow(),
@@ -38,7 +38,7 @@ func (s *Server) chaptersRangeHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	if err := writeXML(w, volumeFeed); err != nil {
+	if err := writeXML(w, chaptersRangeFeed); err != nil {
 		resultErr = fmt.Errorf("writing response: %w", err)
 	}
 }

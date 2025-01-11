@@ -32,7 +32,7 @@ func (s *Server) providersHandler(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	indexFeed := opds.Feed{
+	providersFeed := opds.Feed{
 		ID:          r.RequestURI,
 		Title:       "Mangal OPDS Server",
 		LastUpdated: opds.TimeNow(),
@@ -51,7 +51,7 @@ func (s *Server) providersHandler(w http.ResponseWriter, r *http.Request) {
 		Entries: providerEntries,
 	}
 
-	if err := writeXML(w, indexFeed); err != nil {
+	if err := writeXML(w, providersFeed); err != nil {
 		resultErr = fmt.Errorf("writing response: %w", err)
 	}
 }

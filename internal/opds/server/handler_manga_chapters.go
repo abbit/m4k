@@ -33,7 +33,7 @@ func (s *Server) mangaChaptersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	title := formatMangaTitle(params)
-	chaptersRangeFeed := opds.Feed{
+	mangaChaptersFeed := opds.Feed{
 		ID:          r.RequestURI,
 		Title:       title,
 		LastUpdated: opds.TimeNow(),
@@ -61,7 +61,7 @@ func (s *Server) mangaChaptersHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	if err := writeXML(w, chaptersRangeFeed); err != nil {
+	if err := writeXML(w, mangaChaptersFeed); err != nil {
 		resultErr = fmt.Errorf("writing response: %w", err)
 	}
 }
