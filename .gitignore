@@ -1,3 +1,4 @@
 .DS_Store
 m4k.koplugin/m4k_receiver
 data/
+._*.lua
