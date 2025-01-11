@@ -1,0 +1,9 @@
+.DS_Store
+data/
+._*.lua
+
+docker/
+koreader-customizations/
+README.md
+TODO.txt
+Makefile
