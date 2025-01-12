@@ -2,8 +2,8 @@ package server
 
 import (
 	"context"
+	"log/slog"
 
-	"github.com/abbit/m4k/internal/log"
 	"github.com/luevano/libmangal"
 	"github.com/luevano/libmangal/mangadata"
 )
@@ -50,7 +50,10 @@ func getAllVolumeChapters(ctx context.Context, client *libmangal.Client, volumes
 		if len(volumeChapters) != 0 {
 			chapters = append(chapters, volumeChapters...)
 		} else {
-			log.Info.Printf("no chapters found for volume %.1f", volume.Info().Number)
+			slog.Warn("no chapters in volume",
+				slog.String("manga_title", volume.Manga().Info().Title),
+				slog.Float64("number", float64(volume.Info().Number)),
+			)
 		}
 	}
 	return chapters, nil

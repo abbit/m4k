@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/abbit/m4k/internal/comicbook"
-	"github.com/abbit/m4k/internal/log"
 	"github.com/abbit/m4k/internal/transform"
 	"github.com/abbit/m4k/internal/util"
 	"github.com/luevano/libmangal"
@@ -40,7 +40,8 @@ var (
 func init() {
 	// creating transformed results dir implies creating the base dir too
 	if err := os.MkdirAll(transformedResultsDirPath, os.ModePerm); err != nil {
-		log.Error.Fatalln("creating transformed results dir:", err)
+		slog.Error("creating transformed results dir", slog.Any("error", err))
+		os.Exit(1)
 	}
 }
 
@@ -48,7 +49,7 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 	var resultErr error
 	defer func() {
 		if resultErr != nil {
-			log.Error.Println("downloadHandler:", resultErr)
+			slog.Error("downloadHandler", slog.Any("error", resultErr))
 			http.Error(w, resultErr.Error(), http.StatusInternalServerError)
 		}
 	}()
@@ -61,8 +62,10 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 
 	forDevice := r.URL.Query().Get("for")
 
-	log.Info.Println("params:", params)
-	log.Info.Println("forDevice:", forDevice)
+	slog.Debug("params",
+		slog.Any("params", params),
+		slog.String("forDevice", forDevice),
+	)
 
 	var deviceWidth, deviceHeight int
 	switch forDevice {
@@ -124,7 +127,7 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 					}
 
 					retryAfter := time.Duration(min(10, raParsed)) * time.Second
-					log.Info.Printf("429 Too Many Requests (retry #%d). Retrying in %s\n", retryCount, retryAfter)
+					slog.Debug(fmt.Sprintf("429 Too Many Requests (retry #%d). Retrying in %s\n", retryCount, retryAfter))
 					time.Sleep(retryAfter)
 					continue
 				}
@@ -197,7 +200,10 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func transformCBZ(srcdir, mergedFileName string, chaptersRange []int, transformOpts *transform.Options) (*comicbook.ComicBook, error) {
-	log.Info.Println("Searching cbz files...")
+	slog.Debug("Searching cbz files",
+		slog.String("srcdir", srcdir),
+		slog.Any("chaptersRange", chaptersRange),
+	)
 	cbzFiles, err := util.FilterDirFilePaths(srcdir, func(filepath string) bool {
 		if path.Ext(filepath) != ".cbz" {
 			return false
@@ -220,7 +226,9 @@ func transformCBZ(srcdir, mergedFileName string, chaptersRange []int, transformO
 		return nil, fmt.Errorf("searching cbz files: %w", err)
 	}
 
-	log.Info.Println("Reading cbz files...")
+	slog.Debug("Reading cbz files",
+		slog.Any("cbzFiles", cbzFiles),
+	)
 	var comicbooks []*comicbook.ComicBook
 	for _, path := range cbzFiles {
 		cb, err := comicbook.ReadComicBook(path)
@@ -230,15 +238,19 @@ func transformCBZ(srcdir, mergedFileName string, chaptersRange []int, transformO
 		comicbooks = append(comicbooks, cb)
 	}
 
-	log.Info.Println("Merging cbz files...")
+	slog.Debug("Merging cbz files",
+		slog.Any("mergedFileName", mergedFileName),
+	)
 	combined := comicbook.MergeComicBooks(comicbooks, mergedFileName)
 
-	log.Info.Println("Transforming combined file for Kindle...")
+	slog.Debug("Transforming combined file",
+		slog.Any("transformOpts", transformOpts),
+	)
 	if err := transform.TransformComicBook(combined, transformOpts); err != nil {
 		return nil, fmt.Errorf("transforming pages: %w", err)
 	}
 
-	log.Info.Println("Done transforming CBZ")
+	slog.Debug("Done transforming combined file")
 
 	return combined, nil
 }

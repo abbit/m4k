@@ -3,9 +3,9 @@ package server
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 
-	"github.com/abbit/m4k/internal/log"
 	"github.com/abbit/m4k/internal/opds"
 )
 
@@ -13,7 +13,7 @@ func (s *Server) searchResultsHandler(w http.ResponseWriter, r *http.Request) {
 	var resultErr error
 	defer func() {
 		if resultErr != nil {
-			log.Error.Println("searchResultsHandler:", resultErr)
+			slog.Error("searchResultsHandler", slog.Any("error", resultErr))
 			http.Error(w, resultErr.Error(), http.StatusBadRequest)
 		}
 	}()
@@ -27,7 +27,10 @@ func (s *Server) searchResultsHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx := context.Background()
 
-	log.Info.Printf("searching with %s for %q\n", params.Provider, query)
+	slog.Debug("searching",
+		slog.Any("provider", params.Provider),
+		slog.Any("query", query),
+	)
 
 	searchResults, err := params.Client.SearchMangas(ctx, query)
 	if err != nil {

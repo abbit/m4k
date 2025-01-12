@@ -2,9 +2,9 @@ package server
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 
-	"github.com/abbit/m4k/internal/log"
 	"github.com/abbit/m4k/internal/opds"
 )
 
@@ -12,7 +12,7 @@ func (s *Server) providersHandler(w http.ResponseWriter, r *http.Request) {
 	var resultErr error
 	defer func() {
 		if resultErr != nil {
-			log.Error.Println("providersHandler:", resultErr)
+			slog.Error("providersHandler", slog.Any("error", resultErr))
 			http.Error(w, resultErr.Error(), http.StatusInternalServerError)
 		}
 	}()

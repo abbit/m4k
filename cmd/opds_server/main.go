@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -24,13 +25,17 @@ var providers = []string{
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})))
+
 	ctx := context.Background()
 
 	ctx, cancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
 	if err := run(ctx); err != nil {
-		log.Fatalln(err)
+		slog.Error("while running", slog.Any("error", err))
 	}
 }
 
@@ -41,14 +46,15 @@ func run(ctx context.Context) error {
 	}
 
 	go func() {
-		log.Println("Listening on", server.Addr)
+		slog.Info("Start listening", slog.String("addr", server.Addr))
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalln(err)
+			slog.Error("while listening", slog.Any("error", err))
+			os.Exit(1)
 		}
 	}()
 
 	<-ctx.Done()
-	log.Println("context done, shutting down a server")
+	slog.Info("context done, shutting down a server")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
