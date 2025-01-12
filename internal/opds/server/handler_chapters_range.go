@@ -31,9 +31,10 @@ func (s *Server) chaptersRangeHandler(w http.ResponseWriter, r *http.Request) {
 			linkStart(),
 			// pseudo-search for rendering chapters range input field
 			{
-				Rel:  opds.RelSearch,
-				Type: opds.FeedTypeAcquisition,
-				Href: fmt.Sprintf("/opds/%s/%s/{searchTerms}", params.Provider, params.MangaEncoded),
+				Rel:   opds.RelSearch,
+				Type:  opds.FeedTypeAcquisition,
+				Href:  fmt.Sprintf("/opds/%s/%s/{searchTerms}", params.Provider, params.MangaEncoded),
+				Title: "Enter chapters range",
 			},
 		},
 	}

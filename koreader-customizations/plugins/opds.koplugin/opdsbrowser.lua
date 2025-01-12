@@ -364,11 +364,17 @@ function OPDSBrowser:genItemTableFromCatalog(catalog, item_url)
 						hrefs[link.rel] = build_href(link.href)
 					end
 				end
+				-- get "title" attr
+				local search_title = _("Search")
+				if link.title and type(link.title) == "string" then
+					search_title = link.title
+				end
+				local search_text = "\u{f002} " .. search_title -- append SEARCH icon
 				-- OpenSearch
 				if link.type:find(self.search_type) then
 					if link.href then
 						table.insert(item_table, { -- the first item in each subcatalog
-							text = "\u{f002} " .. _("Search"), -- append SEARCH icon
+							text = search_text,
 							url = build_href(self:getSearchTemplate(build_href(link.href))),
 							searchable = true,
 						})
@@ -379,7 +385,7 @@ function OPDSBrowser:genItemTableFromCatalog(catalog, item_url)
 				if link.type:find(self.search_template_type) and link.rel and link.rel:find("search") then
 					if link.href and not has_opensearch then
 						table.insert(item_table, {
-							text = "\u{f002} " .. _("Search"),
+							text = search_text,
 							url = build_href(link.href:gsub("{searchTerms}", "%%s")),
 							searchable = true,
 						})

@@ -75,9 +75,10 @@ func linkStart() opds.Link {
 
 func linkSearch(provider string) opds.Link {
 	return opds.Link{
-		Rel:  opds.RelSearch,
-		Type: opds.FeedTypeSearchTemplate,
-		Href: fmt.Sprintf("/opds/%s/search?q={searchTerms}", provider),
+		Rel:   opds.RelSearch,
+		Type:  opds.FeedTypeSearchTemplate,
+		Href:  fmt.Sprintf("/opds/%s/search?q={searchTerms}", provider),
+		Title: "Search manga",
 	}
 }
 
