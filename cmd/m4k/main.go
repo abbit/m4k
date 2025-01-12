@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -132,7 +133,7 @@ func main() {
 	flags := parseFlags()
 
 	log.Info.Println("Searching cbz files...")
-	cbzFiles, err := util.FindFilesWithExt(flags.srcdir, ".cbz")
+	cbzFiles, err := util.FilterDirFilePaths(flags.srcdir, func(p string) bool { return path.Ext(p) == ".cbz" })
 	if err != nil {
 		log.Error.Fatalf("%v\n", err)
 	}

@@ -17,21 +17,23 @@ func PathStem(path string) string {
 	return strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 }
 
-// returns slice of paths to cbz files in given directory
-func FindFilesWithExt(dirpath, ext string) ([]string, error) {
+// FilterDirFilePaths returns list of file paths in directory that pass the filter.
+// Paths sorted by filename.
+func FilterDirFilePaths(dirpath string, filter func(path string) bool) ([]string, error) {
 	dirEntries, err := os.ReadDir(dirpath)
 	if err != nil {
 		return nil, fmt.Errorf("when tried to get files from directory: %v", err)
 	}
 
-	var files []string
+	var paths []string
 	for _, f := range dirEntries {
-		if filepath.Ext(f.Name()) == ext {
-			files = append(files, filepath.Join(dirpath, f.Name()))
+		p := filepath.Join(dirpath, f.Name())
+		if filter(p) {
+			paths = append(paths, p)
 		}
 	}
 
-	return files, nil
+	return paths, nil
 }
 
 func RemoveFiles(paths []string) error {

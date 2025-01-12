@@ -161,7 +161,7 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 			// TODO: make configurable
 			Encoding: "jpg",
 		}
-		cb, err := transformCBZ(downloadedMangaDir, mangaChaptersTitle, transformOpts)
+		cb, err := transformCBZ(downloadedMangaDir, mangaChaptersTitle, params.ChaptersRange, transformOpts)
 		if err != nil {
 			resultErr = fmt.Errorf("transforming cbz file: %w", err)
 			return
@@ -192,9 +192,26 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, transformedFileName, time.Time{}, cbzReader)
 }
 
-func transformCBZ(srcdir, mergedFileName string, transformOpts *transform.Options) (*comicbook.ComicBook, error) {
+func transformCBZ(srcdir, mergedFileName string, chaptersRange []int, transformOpts *transform.Options) (*comicbook.ComicBook, error) {
 	log.Info.Println("Searching cbz files...")
-	cbzFiles, err := util.FindFilesWithExt(srcdir, ".cbz")
+	cbzFiles, err := util.FilterDirFilePaths(srcdir, func(filepath string) bool {
+		if path.Ext(filepath) != ".cbz" {
+			return false
+		}
+
+		filename := util.WithoutPaddedIndex(util.PathStem(filepath))
+		chapterInfo := comicbook.ChapterInfoFromName(filename)
+
+		fromChapter := float64(chaptersRange[0])
+		var toChapter float64
+		if len(chaptersRange) == 1 {
+			toChapter = fromChapter
+		} else {
+			toChapter = float64(chaptersRange[1])
+		}
+
+		return chapterInfo.Number >= fromChapter && chapterInfo.Number <= toChapter
+	})
 	if err != nil {
 		return nil, fmt.Errorf("searching cbz files: %w", err)
 	}
