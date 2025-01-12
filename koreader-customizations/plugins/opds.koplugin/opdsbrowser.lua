@@ -480,7 +480,7 @@ function OPDSBrowser:genItemTableFromCatalog(catalog, item_url)
 			end
 		end
 		item.text = title
-		local author = "Unknown Author"
+		local author = ""
 		if type(entry.author) == "table" and entry.author.name then
 			author = entry.author.name
 			if type(author) == "table" then
@@ -488,7 +488,7 @@ function OPDSBrowser:genItemTableFromCatalog(catalog, item_url)
 					author = table.concat(author, ", ")
 				else
 					-- we may get an empty table on https://gallica.bnf.fr/opds
-					author = nil
+					author = ""
 				end
 			end
 			if author then
@@ -578,7 +578,7 @@ end
 function OPDSBrowser:showDownloads(item)
 	local acquisitions = item.acquisitions
 	local filename = item.title
-	if item.author then
+	if item.author and item.author ~= "" then
 		filename = item.author .. " - " .. filename
 	end
 	local filename_orig = filename
