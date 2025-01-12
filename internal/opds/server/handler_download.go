@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path"
@@ -18,7 +19,8 @@ import (
 )
 
 const (
-	baseDirName = "m4k-opds-server"
+	baseDirName         = "m4k-opds-server"
+	transformResultsDir = "transformed"
 )
 
 const (
@@ -29,6 +31,18 @@ const (
 const (
 	maxRetries = 5
 )
+
+var (
+	baseDirPath               = path.Join(os.TempDir(), baseDirName)
+	transformedResultsDirPath = path.Join(baseDirPath, transformResultsDir)
+)
+
+func init() {
+	// creating transformed results dir implies creating the base dir too
+	if err := os.MkdirAll(transformedResultsDirPath, os.ModePerm); err != nil {
+		log.Error.Fatalln("creating transformed results dir:", err)
+	}
+}
 
 func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 	var resultErr error
@@ -59,18 +73,6 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	baseDirPath := path.Join(os.TempDir(), baseDirName)
-
-	// check if the directory exists, create it if not
-	if _, err := os.Stat(baseDirPath); os.IsNotExist(err) {
-		if err := os.Mkdir(baseDirPath, os.ModePerm); err != nil {
-			resultErr = fmt.Errorf("creating base dir: %w", err)
-			return
-		}
-	}
-
-	log.Info.Println("Saving to:", baseDirPath)
-
 	downloadOptions := libmangal.DownloadOptions{
 		Format:            libmangal.FormatCBZ,
 		Directory:         baseDirPath,
@@ -80,10 +82,9 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 		ImageTransformer:  func(data []byte) ([]byte, error) { return data, nil },
 	}
 
-	var resultsDir string
-
 	// FIX: rework this mess
 	// TODO: make configurable
+	var downloadedMangaDir string
 	retryCount := 0
 	for _, chapter := range chapters {
 		retry := true
@@ -120,26 +121,61 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			resultsDir = res.Directory
+			downloadedMangaDir = res.Directory
 		}
 	}
 
-	filename := formatMangaTitle(params)
-	cbzfile, err := transformCBZ(resultsDir, filename)
+	mangaChaptersTitle := formatMangaChaptersTitle(params)
+	transformedFileName := util.SanitizePath(mangaChaptersTitle) + ".cbz"
+	transformedFilePath := path.Join(transformedResultsDirPath, transformedFileName)
+
+	exists, err := util.FileExists(transformedFilePath)
 	if err != nil {
-		resultErr = fmt.Errorf("transforming cbz file: %w", err)
+		resultErr = fmt.Errorf("checking if transformed cbz file exists: %w", err)
 		return
 	}
 
-	cbzReader, err := cbzfile.Reader()
-	if err != nil {
-		resultErr = fmt.Errorf("creating cbz reader: %w", err)
-		return
+	var cbzReader io.ReadSeeker
+	if exists {
+		// file exists already, serve it
+		cbzReader, err = os.Open(transformedFilePath)
+		if err != nil {
+			resultErr = fmt.Errorf("opening transformed cbz file: %w", err)
+			return
+		}
+	} else {
+		// file does not exist, transform it
+
+		// TODO: transform only selected chapters
+		cb, err := transformCBZ(downloadedMangaDir, mangaChaptersTitle)
+		if err != nil {
+			resultErr = fmt.Errorf("transforming cbz file: %w", err)
+			return
+		}
+
+		cbzReader, err = cb.Reader()
+		if err != nil {
+			resultErr = fmt.Errorf("creating cbz reader: %w", err)
+			return
+		}
+
+		// write transformed cbz file to disk
+		cbzfile, err := os.Create(transformedFilePath)
+		if err != nil {
+			resultErr = fmt.Errorf("creating transformed cbz file: %w", err)
+			return
+		}
+
+		if _, err := io.Copy(cbzfile, cbzReader); err != nil {
+			resultErr = fmt.Errorf("writing transformed cbz file: %w", err)
+			return
+		}
+
+		// reset reader to start of file
+		cbzReader.Seek(0, io.SeekStart)
 	}
 
-	// TODO: save result on disk?
-
-	http.ServeContent(w, r, cbzfile.FileName(), time.Time{}, cbzReader)
+	http.ServeContent(w, r, transformedFileName, time.Time{}, cbzReader)
 }
 
 func transformCBZ(srcdir, mergedFileName string) (*comicbook.ComicBook, error) {

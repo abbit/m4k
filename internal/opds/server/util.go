@@ -103,6 +103,6 @@ func formatChaptersRange(chaptersRange []int) string {
 	return fmt.Sprintf("Chapters %d-%d", chaptersRange[0], chaptersRange[1])
 }
 
-func formatMangaTitle(params *params) string {
+func formatMangaChaptersTitle(params *params) string {
 	return fmt.Sprintf("%s %s", params.Manga, formatChaptersRange(params.ChaptersRange))
 }

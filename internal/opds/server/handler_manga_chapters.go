@@ -32,7 +32,7 @@ func (s *Server) mangaChaptersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	title := formatMangaTitle(params)
+	title := formatMangaChaptersTitle(params)
 	mangaChaptersFeed := opds.Feed{
 		ID:          r.RequestURI,
 		Title:       title,

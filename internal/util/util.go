@@ -92,3 +92,17 @@ func SanitizePath(path string) string {
 		return r == underscore || unicode.IsSpace(r)
 	})
 }
+
+func FileExists(path string) (bool, error) {
+	info, err := os.Stat(path)
+	if err == nil {
+		if info.IsDir() {
+			return false, fmt.Errorf("path is a directory: %s", path)
+		}
+		return true, nil
+	} else if os.IsNotExist(err) {
+		return false, nil
+	} else {
+		return false, err
+	}
+}
