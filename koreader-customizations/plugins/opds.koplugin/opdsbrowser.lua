@@ -764,7 +764,7 @@ function OPDSBrowser:downloadFile(filename, remote_url)
 
 			local code, headers, status
 			if parsed.scheme == "http" or parsed.scheme == "https" then
-				socketutil:set_timeout(socketutil.FILE_BLOCK_TIMEOUT, socketutil.FILE_TOTAL_TIMEOUT)
+				socketutil:set_timeout(socketutil.FILE_BLOCK_TIMEOUT, socketutil.FILE_TOTAL_TIMEOUT * 10)
 				code, headers, status = socket.skip(
 					1,
 					http.request({
