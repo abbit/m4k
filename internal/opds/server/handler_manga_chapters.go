@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/http"
 
 	"github.com/abbit/m4k/internal/log"
@@ -27,9 +28,34 @@ func (s *Server) mangaChaptersHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 
 	// Try to get chapters to check if they exist now
-	if _, err = getChapters(ctx, params.Client, params.Manga, params.ChaptersRange); err != nil {
+	chapters, err := getChapters(ctx, params.Client, params.Manga, params.ChaptersRange)
+	if err != nil {
 		resultErr = fmt.Errorf("getting chapters: %w", err)
 		return
+	}
+	if len(chapters) == 0 {
+		resultErr = nil
+		http.Error(w, "got 0 chapters", http.StatusBadRequest)
+		return
+	}
+
+	// set max chapter to the last chapter, if bigger chapter number is used
+	var maxChapter float32
+	for _, chapter := range chapters {
+		maxChapter = max(maxChapter, chapter.Info().Number)
+	}
+	maxChapterInt := int(math.Ceil(float64(maxChapter)))
+
+	if params.ChaptersRange[0] > maxChapterInt {
+		resultErr = nil
+		http.Error(w, fmt.Sprintf("'from' chapter number %d is bigger than last chapter number %d", params.ChaptersRange[0], maxChapterInt), http.StatusBadRequest)
+		return
+	}
+
+	if len(params.ChaptersRange) == 2 {
+		if params.ChaptersRange[1] > maxChapterInt {
+			params.ChaptersRange[1] = maxChapterInt
+		}
 	}
 
 	title := formatMangaChaptersTitle(params)
@@ -53,7 +79,7 @@ func (s *Server) mangaChaptersHandler(w http.ResponseWriter, r *http.Request) {
 					{
 						Rel:   opds.RelAcquisition,
 						Type:  opds.FileTypeCBZ,
-						Href:  fmt.Sprintf("/opds/%s/%s/%s/download?format=cbz&for=kindle", params.Provider, params.MangaEncoded, params.ChaptersRangeStr),
+						Href:  fmt.Sprintf("/opds/%s/%s/%s/download?for=kindle-pw5", params.Provider, params.MangaEncoded, encodeChaptersRange(params.ChaptersRange)),
 						Title: "cbz",
 					},
 				},

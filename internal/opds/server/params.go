@@ -9,12 +9,11 @@ import (
 )
 
 type params struct {
-	Provider         string
-	Client           *libmangal.Client
-	MangaEncoded     string
-	Manga            mangadata.Manga
-	ChaptersRangeStr string
-	ChaptersRange    []int
+	Provider      string
+	Client        *libmangal.Client
+	MangaEncoded  string
+	Manga         mangadata.Manga
+	ChaptersRange []int
 }
 
 func (s *Server) parseRequestParams(r *http.Request) (*params, error) {
@@ -50,7 +49,6 @@ func (s *Server) parseRequestParams(r *http.Request) (*params, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parsing chapters range: %w", err)
 	}
-	p.ChaptersRangeStr = chaptersRangeStr
 	p.ChaptersRange = chaptersRange
 
 	return p, nil

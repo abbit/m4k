@@ -59,11 +59,19 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	format := r.URL.Query().Get("format")
 	forDevice := r.URL.Query().Get("for")
 
-	log.Info.Println(params)
-	log.Info.Println(format, forDevice)
+	log.Info.Println("params:", params)
+	log.Info.Println("forDevice:", forDevice)
+
+	var deviceWidth, deviceHeight int
+	switch forDevice {
+	case "kindle-pw5":
+		deviceWidth, deviceHeight = KindlePW5Width, KindlePW5Height
+	default:
+		resultErr = fmt.Errorf("unsupported device: %s", forDevice)
+		return
+	}
 
 	ctx := context.Background()
 
@@ -147,7 +155,13 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 		// file does not exist, transform it
 
 		// TODO: transform only selected chapters
-		cb, err := transformCBZ(downloadedMangaDir, mangaChaptersTitle)
+		transformOpts := &transform.Options{
+			Width:  deviceWidth,
+			Height: deviceHeight,
+			// TODO: make configurable
+			Encoding: "jpg",
+		}
+		cb, err := transformCBZ(downloadedMangaDir, mangaChaptersTitle, transformOpts)
 		if err != nil {
 			resultErr = fmt.Errorf("transforming cbz file: %w", err)
 			return
@@ -178,7 +192,7 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, transformedFileName, time.Time{}, cbzReader)
 }
 
-func transformCBZ(srcdir, mergedFileName string) (*comicbook.ComicBook, error) {
+func transformCBZ(srcdir, mergedFileName string, transformOpts *transform.Options) (*comicbook.ComicBook, error) {
 	log.Info.Println("Searching cbz files...")
 	cbzFiles, err := util.FindFilesWithExt(srcdir, ".cbz")
 	if err != nil {
@@ -199,11 +213,6 @@ func transformCBZ(srcdir, mergedFileName string) (*comicbook.ComicBook, error) {
 	combined := comicbook.MergeComicBooks(comicbooks, mergedFileName)
 
 	log.Info.Println("Transforming combined file for Kindle...")
-	transformOpts := &transform.Options{
-		Width:    KindlePW5Width,
-		Height:   KindlePW5Height,
-		Encoding: "jpg",
-	}
 	if err := transform.TransformComicBook(combined, transformOpts); err != nil {
 		return nil, fmt.Errorf("transforming pages: %w", err)
 	}

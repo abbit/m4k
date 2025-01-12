@@ -82,17 +82,41 @@ func linkSearch(provider string) opds.Link {
 }
 
 func parseChaptersRange(rangeStr string) ([]int, error) {
+	splittedRange := strings.Split(strings.TrimSpace(rangeStr), "-")
+	if len(splittedRange) == 0 {
+		return nil, fmt.Errorf("empty chapters range")
+	}
+	if len(splittedRange) > 2 {
+		return nil, fmt.Errorf("invalid chapters range: %s", rangeStr)
+	}
+
 	var chaptersRange []int
-	for _, numStr := range strings.Split(rangeStr, "-") {
+	for _, numStr := range splittedRange {
 		num, err := strconv.Atoi(numStr)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parsing chapter number '%s': %w", numStr, err)
 		}
 
 		chaptersRange = append(chaptersRange, num)
 	}
 
+	// TODO: can there be negative chapter numbers?
+	if chaptersRange[0] < 0 {
+		return nil, fmt.Errorf("'from' chapter is less than 0: %s", rangeStr)
+	}
+
+	if len(chaptersRange) == 2 && chaptersRange[0] > chaptersRange[1] {
+		return nil, fmt.Errorf("'from' chapter is greater than 'to' chapter: %s", rangeStr)
+	}
+
 	return chaptersRange, nil
+}
+
+func encodeChaptersRange(chaptersRange []int) string {
+	if len(chaptersRange) == 1 {
+		return fmt.Sprintf("%d", chaptersRange[0])
+	}
+	return fmt.Sprintf("%d-%d", chaptersRange[0], chaptersRange[1])
 }
 
 func formatChaptersRange(chaptersRange []int) string {
