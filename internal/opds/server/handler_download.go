@@ -80,6 +80,12 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 		resultErr = fmt.Errorf("getting chapters: %w", err)
 		return
 	}
+	if len(chapters) == 0 {
+		resultErr = nil
+		errMsg := fmt.Sprintf("got 0 chapters for manga %s", params.Manga.Info().Title)
+		http.Error(w, errMsg, http.StatusNotFound)
+		return
+	}
 
 	downloadOptions := libmangal.DownloadOptions{
 		Format:            libmangal.FormatCBZ,
@@ -90,8 +96,7 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 		ImageTransformer:  func(data []byte) ([]byte, error) { return data, nil },
 	}
 
-	// FIX: rework this mess
-	// TODO: make configurable
+	// TODO: rework this mess
 	var downloadedMangaDir string
 	retryCount := 0
 	for _, chapter := range chapters {
@@ -154,7 +159,6 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// file does not exist, transform it
 
-		// TODO: transform only selected chapters
 		transformOpts := &transform.Options{
 			Width:  deviceWidth,
 			Height: deviceHeight,
@@ -202,8 +206,8 @@ func transformCBZ(srcdir, mergedFileName string, chaptersRange []int, transformO
 		filename := util.WithoutPaddedIndex(util.PathStem(filepath))
 		chapterInfo := comicbook.ChapterInfoFromName(filename)
 
-		fromChapter := float64(chaptersRange[0])
-		var toChapter float64
+		var fromChapter, toChapter float64
+		fromChapter = float64(chaptersRange[0])
 		if len(chaptersRange) == 1 {
 			toChapter = fromChapter
 		} else {

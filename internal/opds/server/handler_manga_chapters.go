@@ -35,7 +35,8 @@ func (s *Server) mangaChaptersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(chapters) == 0 {
 		resultErr = nil
-		http.Error(w, "got 0 chapters", http.StatusBadRequest)
+		errMsg := fmt.Sprintf("got 0 chapters for manga %s", params.Manga.Info().Title)
+		http.Error(w, errMsg, http.StatusNotFound)
 		return
 	}
 

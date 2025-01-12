@@ -2,9 +2,8 @@ package server
 
 import (
 	"context"
-	"fmt"
-	"log"
 
+	"github.com/abbit/m4k/internal/log"
 	"github.com/luevano/libmangal"
 	"github.com/luevano/libmangal/mangadata"
 )
@@ -14,10 +13,6 @@ func getChapters(ctx context.Context, client *libmangal.Client, manga mangadata.
 	if err != nil {
 		return nil, err
 	}
-	if len(volumes) == 0 {
-		// TODO: use query instead of title?
-		return nil, fmt.Errorf("no manga volumes found with provider %q title %q", client.Info().Name, manga.Info().Title)
-	}
 
 	chapters, err := getAllVolumeChapters(ctx, client, volumes)
 	if err != nil {
@@ -25,18 +20,18 @@ func getChapters(ctx context.Context, client *libmangal.Client, manga mangadata.
 	}
 
 	var selectedChapters []mangadata.Chapter
-	var fromChapter, toChapter int
-	// TODO: if len = 0; if len > 2
-	// TODO: optimize
-	fromChapter = chaptersRange[0]
+
+	var fromChapter, toChapter float32
+	fromChapter = float32(chaptersRange[0])
 	if len(chaptersRange) == 1 {
 		toChapter = fromChapter
 	} else {
-		toChapter = chaptersRange[1]
+		toChapter = float32(chaptersRange[1])
 	}
+
 	for _, chapter := range chapters {
 		chapterNum := chapter.Info().Number
-		if chapterNum >= float32(fromChapter) && chapterNum <= float32(toChapter) {
+		if chapterNum >= fromChapter && chapterNum <= toChapter {
 			selectedChapters = append(selectedChapters, chapter)
 		}
 	}
@@ -55,7 +50,7 @@ func getAllVolumeChapters(ctx context.Context, client *libmangal.Client, volumes
 		if len(volumeChapters) != 0 {
 			chapters = append(chapters, volumeChapters...)
 		} else {
-			log.Printf("no chapters found for volume %.1f", volume.Info().Number)
+			log.Info.Printf("no chapters found for volume %.1f", volume.Info().Number)
 		}
 	}
 	return chapters, nil
