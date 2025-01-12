@@ -1,7 +1,5 @@
 FROM golang:1.22.10
 
-LABEL org.opencontainers.image.source=https://github.com/abbit/m4k
-
 WORKDIR /app
 
 COPY . .
