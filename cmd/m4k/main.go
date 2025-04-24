@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -132,6 +133,10 @@ func parseFlags() *Flags {
 func main() {
 	flags := parseFlags()
 
+	if err := validateName(flags.name); err != nil {
+		log.Error.Fatalf("failed validating name: %v\n", err)
+	}
+
 	log.Info.Println("Searching cbz files...")
 	cbzFiles, err := util.FilterDirFilePaths(flags.srcdir, func(p string) bool { return path.Ext(p) == ".cbz" })
 	if err != nil {
@@ -186,4 +191,16 @@ func main() {
 	}
 
 	log.Info.Println("Done!")
+}
+
+var disallowedSymbols = []rune("/:")
+
+func validateName(name string) error {
+	for _, disallowedSymbol := range disallowedSymbols {
+		if strings.ContainsRune(name, disallowedSymbol) {
+			return fmt.Errorf("%q contains disallowed symbol %q", name, disallowedSymbol)
+		}
+	}
+
+	return nil
 }
